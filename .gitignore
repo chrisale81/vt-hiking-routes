@@ -1,0 +1,12 @@
+# Cached swissTLM3D download (~560 MB, re-downloaded on demand)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# macOS
+.DS_Store
