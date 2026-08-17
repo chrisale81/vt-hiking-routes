@@ -46,6 +46,28 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Choosing the points
+
+Points come either from the official `geo.admin.ch` search index or from clicking the map
+(*Choose points by: Search / Map*). On the map, a radio decides what the next click
+places, so you can set the start, the destination and any number of waypoints, with
+*Undo waypoint* and *Clear all* to correct yourself.
+
+## Loop or one-way
+
+**Loop** (default) generates circular routes of the requested duration towards a
+direction target, as described below.
+
+Unticking **Loop** plans a one-way route from the start, through the waypoints in order,
+to a destination. Duration is then an outcome rather than a target, so the duration
+slider and its tolerance do not apply -- the endpoints decide how long the walk is.
+Several distinct variants are offered where the network allows, and the road and
+herding-dog rules still hold.
+
+**Alpine hiking trails forbidden** and **Limit steepness to reference route** are both
+optional. Unticking the alpine ban admits `Alpinwanderweg` (white-blue-white) routes,
+which can be exposed or secured terrain and are rarely suitable for a dog.
+
 ## How loop generation works
 
 1. Resolve start, direction and optional steepness-reference locations using the official `geo.admin.ch` SearchServer.
@@ -56,6 +78,7 @@ streamlit run app.py
    - `Bergwanderweg` → allowed / preferred
    - `Alpinwanderweg` → **removed from the graph**
    - `andere` → allowed, but strongly penalized by default
+4a. Cut alpine pastures guarded by livestock guardian dogs out of the linework (federal layer `ch.bafu.alpweiden-herdenschutzhunde`), keeping the part of a trail that lies outside a pasture.
 5. Build a noded NetworkX routing graph from the official linework, classifying each segment by how much motor traffic to expect on it:
    - `1m Weg`, `2m Weg`, `Markierte Spur` → traffic-free
    - road width but with a driving ban, marked as not drivable, or an unpaved `Natur` surface → traffic-calmed (farm and forest tracks)
@@ -99,7 +122,36 @@ tolerance and is genuinely different from the ones above it.
 
 ## Walking with a dog
 
-Roads open to motor traffic are the main hazard, so they are treated as a cost and capped
+### Herding dogs (Herdenschutzhunde)
+
+Alpine pastures guarded by livestock guardian dogs are **cut out of the routing network**
+entirely, not merely discouraged. The dogs defend the herd against approaching dogs, so
+these areas are off limits when walking one.
+
+The source is the federal layer `ch.bafu.alpweiden-herdenschutzhunde` (BAFU, "Alpweiden
+geschützt durch Herdenschutzhunde"), queried live for the search area. Every polygon in
+that layer is a guarded pasture -- it carries no "no dogs here" flag -- so the presence of
+a polygon is the signal. A trail that only clips a corner keeps the part outside the
+pasture rather than being dropped whole.
+
+The pastures are shaded orange on the map, with the pasture name and the farmer's contact
+details in the popup, and a warning above the routes lists what is nearby.
+
+This fails closed: if the federal layer cannot be reached, planning stops rather than
+quietly routing through a pasture. Turn the setting off if you are walking without a dog.
+
+Two things to know:
+
+- **Grazing is seasonal** and the layer can lag reality. Check
+  [protectiondestroupeaux.ch](https://www.protectiondestroupeaux.ch/) before you go; the
+  popup links to the official map for each pasture.
+- **The safety margin defaults to 0 m**, meaning exactly the mapped pasture. A margin is
+  available but can swallow a trailhead that sits close to a boundary and make every
+  route from it impossible -- which is what happens at Segnas with a 50 m margin.
+
+### Roads
+
+Roads open to motor traffic are the other hazard, so they are treated as a cost and capped
 by the *Max share on roads with cars* tolerance in the sidebar. The stretches that remain
 are drawn in red on the map, with the metres given under the route metrics.
 
@@ -165,6 +217,7 @@ Those can be added as additional exclusion/penalty layers later.
 - geo.admin.ch SearchServer: https://api3.geo.admin.ch/rest/services/ech/SearchServer
 - geo.admin.ch elevation profile: https://api3.geo.admin.ch/rest/services/profile.json
 - swisstopo WMTS basemap: https://wmts.geo.admin.ch/
+- BAFU pastures with livestock guardian dogs: layer `ch.bafu.alpweiden-herdenschutzhunde`
 
 ## Cache refresh
 

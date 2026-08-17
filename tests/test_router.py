@@ -340,3 +340,126 @@ def test_gravel_road_counts_as_traffic_calmed():
     # A paved 3 m lane is a road cars use; the same width in gravel is a farm track.
     assert normalize_traffic_class("3m Strasse", belagsart="Hart") == TRAFFIC_ROAD
     assert normalize_traffic_class("3m Strasse", belagsart="Natur") == TRAFFIC_CALMED
+
+
+def test_herding_dog_areas_are_cut_out_of_the_network(tmp_path):
+    """A trail crossing a guarded pasture keeps only the part outside it."""
+    import geopandas as gpd
+    from shapely.geometry import LineString, Polygon
+    from router import CATEGORY_WANDERWEG, herding_dog_exclusion, load_hiking_lines
+
+    pasture = Polygon([(2600500, 1200000), (2601500, 1200000), (2601500, 1201000), (2600500, 1201000)])
+    areas = [{"geometry": pasture, "name": "Alp Test"}]
+
+    exclusion = herding_dog_exclusion(areas, buffer_m=0.0)
+    assert exclusion is not None
+    # The buffer widens the no-go zone rather than shrinking it.
+    assert herding_dog_exclusion(areas, buffer_m=50.0).area > exclusion.area
+
+    # A line running straight through the pasture, written to a real GeoPackage.
+    crossing = LineString([(2600000, 1200500), (2602000, 1200500)])
+    gdf = gpd.GeoDataFrame(
+        {"objektart": ["1m Weg"], "wanderwege": [CATEGORY_WANDERWEG]},
+        geometry=[crossing],
+        crs=2056,
+    )
+    gpkg = tmp_path / "trails.gpkg"
+    gdf.to_file(gpkg, layer="trails", driver="GPKG")
+    bbox = (2599000, 1199000, 2603000, 1202000)
+
+    without = load_hiking_lines(gpkg, "trails", bbox)
+    assert without.geometry.length.sum() == pytest.approx(2000.0)
+
+    with_ban = load_hiking_lines(gpkg, "trails", bbox, exclusion=exclusion)
+    remaining = with_ban.geometry.length.sum()
+    # 2 km of trail, 1 km of it inside the pasture: only the outside half survives.
+    assert remaining == pytest.approx(1000.0)
+    assert not with_ban.geometry.intersects(pasture.buffer(-1)).any()
+
+
+def test_herding_area_geojson_reprojects_to_wgs84():
+    from shapely.geometry import Polygon
+    from router import herding_area_geojson
+
+    pasture = Polygon([(2708738, 1183224), (2709738, 1183224), (2709738, 1184224), (2708738, 1184224)])
+    fc = herding_area_geojson([{"geometry": pasture, "name": "Alp Cavrein", "url": "https://example.ch"}])
+
+    assert fc["type"] == "FeatureCollection" and len(fc["features"]) == 1
+    feature = fc["features"][0]
+    assert feature["properties"]["name"] == "Alp Cavrein"
+    lon, lat = feature["geometry"]["coordinates"][0][0]
+    # Somewhere in Graubünden, in degrees rather than metres.
+    assert 8.5 < lon < 9.5 and 46.0 < lat < 47.0
+
+
+def _corridor_graph_gpkg(tmp_path):
+    """Two parallel trails between the same endpoints, so alternatives exist."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    north = LineString([(2600000, 1200000), (2601000, 1200400), (2602000, 1200000)])
+    south = LineString([(2600000, 1200000), (2601000, 1199600), (2602000, 1200000)])
+    gdf = gpd.GeoDataFrame(
+        {"objektart": ["1m Weg", "1m Weg"], "wanderwege": ["Wanderweg", "Wanderweg"]},
+        geometry=[north, south],
+        crs=2056,
+    )
+    gpkg = tmp_path / "corridor.gpkg"
+    gdf.to_file(gpkg, layer="trails", driver="GPKG")
+    return gpkg
+
+
+def test_point_to_point_route_reaches_the_destination(tmp_path, monkeypatch):
+    import router
+    from router import lv95_to_lonlat
+
+    gpkg = _corridor_graph_gpkg(tmp_path)
+
+    def fake_profile(nodes, session=None, spacing_m=20.0):
+        return [
+            {"dist": 0.0, "easting": 2600000.0, "northing": 1200000.0, "alts": {"COMB": 1000.0}},
+            {"dist": 2000.0, "easting": 2602000.0, "northing": 1200000.0, "alts": {"COMB": 1000.0}},
+        ]
+
+    monkeypatch.setattr(router, "fetch_elevation_profile", fake_profile)
+
+    start = tuple(reversed(lv95_to_lonlat((2600000, 1200000))))
+    end = tuple(reversed(lv95_to_lonlat((2602000, 1200000))))
+    config = router.PlannerConfig(avoid_herding_dogs=False)
+
+    routes, _ = router.plan_point_to_point(gpkg, "trails", start, end, config)
+    assert routes
+    # A one-way route starts at the start and ends at the destination, not back home.
+    first, last = routes[0].nodes[0], routes[0].nodes[-1]
+    assert math.hypot(first[0] - 2600000, first[1] - 1200000) < 30
+    assert math.hypot(last[0] - 2602000, last[1] - 1200000) < 30
+    # Both corridors are offered rather than the same line twice.
+    assert len(routes) >= 2
+
+
+def test_point_to_point_visits_its_waypoint(tmp_path, monkeypatch):
+    import router
+    from router import lv95_to_lonlat
+
+    gpkg = _corridor_graph_gpkg(tmp_path)
+    monkeypatch.setattr(
+        router, "fetch_elevation_profile",
+        lambda nodes, session=None, spacing_m=20.0: [
+            {"dist": 0.0, "easting": 2600000.0, "northing": 1200000.0, "alts": {"COMB": 1000.0}},
+            {"dist": 2000.0, "easting": 2602000.0, "northing": 1200000.0, "alts": {"COMB": 1000.0}},
+        ],
+    )
+
+    start = tuple(reversed(lv95_to_lonlat((2600000, 1200000))))
+    end = tuple(reversed(lv95_to_lonlat((2602000, 1200000))))
+    via_south = tuple(reversed(lv95_to_lonlat((2601000, 1199600))))
+    config = router.PlannerConfig(avoid_herding_dogs=False)
+
+    routes, _ = router.plan_point_to_point(
+        gpkg, "trails", start, end, config, waypoints_latlon=[via_south]
+    )
+    assert routes
+    # The southern bend must appear in the route that was told to go via it.
+    assert any(
+        math.hypot(n[0] - 2601000, n[1] - 1199600) < 30 for n in routes[0].nodes
+    )

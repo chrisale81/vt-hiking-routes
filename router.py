@@ -19,8 +19,8 @@ import numpy as np
 import pyogrio
 import requests
 from pyproj import Transformer
-from shapely.geometry import GeometryCollection, LineString, MultiLineString, mapping
-from shapely.ops import unary_union
+from shapely.geometry import GeometryCollection, LineString, MultiLineString, Point as ShapelyPoint, mapping, shape as shapely_shape
+from shapely.ops import transform as shapely_transform, unary_union
 
 
 CKAN_PACKAGE_URL = (
@@ -29,6 +29,9 @@ CKAN_PACKAGE_URL = (
 )
 SEARCH_URL = "https://api3.geo.admin.ch/rest/services/ech/SearchServer"
 PROFILE_URL = "https://api3.geo.admin.ch/rest/services/profile.json"
+HERDING_DOG_URL = "https://api3.geo.admin.ch/rest/services/all/MapServer/identify"
+# Alpweiden geschuetzt durch Herdenschutzhunde (BAFU).
+HERDING_DOG_LAYER = "ch.bafu.alpweiden-herdenschutzhunde"
 
 EPSG_LV95 = 2056
 EPSG_WGS84 = 4326
@@ -135,6 +138,14 @@ class PlannerConfig:
     car_road_penalty: float = 2.0
     max_car_road_share: float = 0.20
     alpine_forbidden: bool = True
+    # Alpine pastures guarded by livestock guardian dogs are off limits with a dog:
+    # the dogs treat an approaching dog as a threat to the herd. Routes are cut out of
+    # them entirely, with a margin, rather than merely discouraged.
+    avoid_herding_dogs: bool = True
+    # Exclude exactly the officially mapped pastures. A blanket safety margin sounds
+    # prudent but swallows the start itself when a trailhead sits near a boundary,
+    # which makes every route impossible; opt into one deliberately instead.
+    herding_dog_buffer_m: float = 0.0
     node_spacing_m: float = 20.0
     max_snap_m: float = 600.0
     direction_cone_deg: float = 75.0
@@ -454,6 +465,100 @@ def detect_hiking_column(columns: Sequence[str]) -> str | None:
     return candidates[0] if len(candidates) == 1 else None
 
 
+def fetch_herding_dog_areas(
+    bbox: tuple[float, float, float, float],
+    session: requests.Session | None = None,
+    limit: int = 200,
+) -> list[dict]:
+    """Alpine pastures guarded by livestock guardian dogs, from the federal BAFU layer.
+
+    Every polygon in `ch.bafu.alpweiden-herdenschutzhunde` is a pasture protected by
+    Herdenschutzhunde -- the layer carries no "no dogs here" flag -- so presence of a
+    polygon is the signal. Geometry comes back in LV95, the same frame as the routing
+    graph, so no reprojection is needed.
+    """
+    sess = session or requests.Session()
+    extent = ",".join(f"{v:.1f}" for v in bbox)
+    response = sess.get(
+        HERDING_DOG_URL,
+        params={
+            "geometry": extent,
+            "geometryType": "esriGeometryEnvelope",
+            "layers": f"all:{HERDING_DOG_LAYER}",
+            "mapExtent": extent,
+            "imageDisplay": "100,100,96",
+            "tolerance": "0",
+            "sr": str(EPSG_LV95),
+            "returnGeometry": "true",
+            "geometryFormat": "geojson",
+            "limit": str(limit),
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+
+    areas: list[dict] = []
+    for feature in response.json().get("results", []):
+        geometry = feature.get("geometry")
+        if not geometry:
+            continue
+        try:
+            shape = shapely_shape(geometry)
+        except Exception:
+            continue
+        if shape.is_empty:
+            continue
+        if not shape.is_valid:
+            shape = shape.buffer(0)
+        props = feature.get("properties") or {}
+        areas.append(
+            {
+                "geometry": shape,
+                "name": props.get("name") or props.get("label") or "Alpweide",
+                "contact_name": props.get("kontname"),
+                "contact_phone": props.get("konttel"),
+                "contact_email": props.get("kontemail"),
+                "url": props.get("refmeldungbeweidungszone"),
+            }
+        )
+    return areas
+
+
+def herding_dog_exclusion(areas: Sequence[dict], buffer_m: float = 0.0):
+    """Union of the guarded pastures, optionally widened by a safety margin."""
+    shapes = [a["geometry"] for a in areas if a.get("geometry") is not None]
+    if not shapes:
+        return None
+    union = unary_union(shapes)
+    if buffer_m > 0:
+        union = union.buffer(float(buffer_m))
+    return union if not union.is_empty else None
+
+
+def herding_area_geojson(areas: Sequence[dict]) -> dict:
+    """The guarded pastures as WGS84 GeoJSON, ready to drop onto a Leaflet map."""
+    features = []
+    for area in areas:
+        geometry = area.get("geometry")
+        if geometry is None or geometry.is_empty:
+            continue
+        wgs84 = shapely_transform(lambda x, y, z=None: LV95_TO_WGS84.transform(x, y), geometry)
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": mapping(wgs84),
+                "properties": {
+                    "name": area.get("name") or "Alpweide",
+                    "contact_name": area.get("contact_name") or "",
+                    "contact_phone": area.get("contact_phone") or "",
+                    "contact_email": area.get("contact_email") or "",
+                    "url": area.get("url") or "",
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
 def _bbox_around(center_lv95: tuple[float, float], radius_m: float) -> tuple[float, float, float, float]:
     x, y = center_lv95
     return x - radius_m, y - radius_m, x + radius_m, y + radius_m
@@ -470,6 +575,7 @@ def load_hiking_lines(
     layer: str,
     bbox: tuple[float, float, float, float],
     alpine_forbidden: bool = True,
+    exclusion=None,
 ) -> gpd.GeoDataFrame:
     gdf = pyogrio.read_dataframe(gpkg, layer=layer, bbox=bbox)
     if gdf.empty:
@@ -517,6 +623,20 @@ def load_hiking_lines(
         gdf = gdf[gdf["_category"] != CATEGORY_ALPIN].copy()
     if gdf.empty:
         raise HikingPlannerError("No hiking lines remain after excluding alpine hiking trails.")
+
+    if exclusion is not None:
+        # Cut the guarded pastures out rather than dropping whole trails: a path that
+        # only clips a corner stays usable for the part outside the pasture.
+        touched = gdf.geometry.intersects(exclusion)
+        if touched.any():
+            gdf.loc[touched, "geometry"] = gdf.loc[touched, "geometry"].difference(exclusion)
+            gdf = gdf[~gdf.geometry.is_empty & gdf.geometry.notna()].copy()
+            gdf = gdf[gdf.geom_type.isin(["LineString", "MultiLineString"])].copy()
+        if gdf.empty:
+            raise HikingPlannerError(
+                "The whole area around this start is alpine pasture guarded by "
+                "livestock guardian dogs, so no route avoids them."
+            )
     return gdf
 
 
@@ -1203,6 +1323,191 @@ def generate_loop_candidates(
     return final
 
 
+def _alternative_paths(
+    graph: nx.Graph,
+    legs: Sequence[tuple[tuple[float, float], tuple[float, float]]],
+    count: int,
+) -> list[list[tuple[float, float]]]:
+    """Up to `count` distinct routes over the same sequence of legs.
+
+    Each round charges for the edges the previous rounds used, which yields genuinely
+    different lines without running k-shortest-paths over a national graph.
+    """
+    used: Counter = Counter()
+    seen: set = set()
+    routes: list[list[tuple[float, float]]] = []
+
+    for _ in range(max(count, 1)):
+        def weight(u, v, data):
+            base = float(data.get("routing_cost", data.get("walk_minutes", 1.0)))
+            return base * (1.0 + 10.0 * used[_edge_key(u, v)])
+
+        path: list[tuple[float, float]] = []
+        for a, b in legs:
+            try:
+                leg = nx.shortest_path(graph, a, b, weight=weight)
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                return routes
+            path = leg if not path else path + leg[1:]
+
+        signature = tuple(path_edges(path))
+        if signature in seen:
+            break
+        seen.add(signature)
+        routes.append(path)
+        for edge in path_edges(path):
+            used[edge] += 1
+    return routes
+
+
+def plan_point_to_point(
+    gpkg: Path,
+    layer: str,
+    start_latlon: tuple[float, float],
+    end_latlon: tuple[float, float],
+    config: PlannerConfig,
+    waypoints_latlon: Sequence[tuple[float, float]] = (),
+    reference_grade_limit: float | None = None,
+    session: requests.Session | None = None,
+    herding_dog_areas: Sequence[dict] | None = None,
+    alternatives: int = 4,
+) -> tuple[list[RouteCandidate], nx.Graph]:
+    """One-way route from start through the waypoints to the destination.
+
+    Duration is an outcome here rather than a target, so the duration window that governs
+    loops does not apply -- the endpoints decide how long the walk is. Road and
+    herding-dog rules still apply, and the road tolerance is still enforced.
+    """
+    points = [latlon_to_lv95(start_latlon)]
+    points += [latlon_to_lv95(p) for p in waypoints_latlon]
+    points.append(latlon_to_lv95(end_latlon))
+
+    span = max(
+        math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(points[:-1], points[1:])
+    ) if len(points) > 1 else 0.0
+    bbox = _bbox_around_points(points, margin_m=max(3000.0, span * 0.75))
+
+    exclusion = None
+    if config.avoid_herding_dogs:
+        areas = herding_dog_areas
+        if areas is None:
+            try:
+                areas = fetch_herding_dog_areas(bbox, session=session)
+            except Exception as exc:
+                raise HikingPlannerError(
+                    f"Could not load the federal herding-dog pasture layer ({exc}). "
+                    "Routes are not planned without it while 'Avoid herding dog pastures' is on."
+                ) from exc
+        exclusion = herding_dog_exclusion(areas, config.herding_dog_buffer_m)
+        labelled = [("start", points[0]), ("destination", points[-1])]
+        labelled += [(f"waypoint {i}", p) for i, p in enumerate(points[1:-1], start=1)]
+        for label, point in labelled:
+            if exclusion is None or not exclusion.contains(ShapelyPoint(*point)):
+                continue
+            named = [
+                a["name"] for a in (areas or [])
+                if a.get("geometry") is not None and a["geometry"].contains(ShapelyPoint(*point))
+            ]
+            where = f" ({', '.join(named)})" if named else ""
+            raise HikingPlannerError(
+                f"The {label} lies inside an alpine pasture guarded by livestock guardian "
+                f"dogs{where}, so no route can reach it while those areas are excluded. "
+                "Pick a point outside the shaded area, or switch off 'Avoid herding dog "
+                "pastures'."
+            )
+
+    gdf = load_hiking_lines(
+        gpkg, layer, bbox, alpine_forbidden=config.alpine_forbidden, exclusion=exclusion
+    )
+    graph = build_graph(gdf, config)
+
+    snapped = []
+    for point in points:
+        node, snap = nearest_graph_node(graph, point)
+        if snap > config.max_snap_m:
+            raise HikingPlannerError(
+                f"A chosen point is {snap:.0f} m from the hiking network; "
+                f"the limit is {config.max_snap_m:.0f} m. Pick a spot nearer a path."
+            )
+        snapped.append(node)
+
+    legs = list(zip(snapped[:-1], snapped[1:]))
+    routes = _alternative_paths(graph, legs, alternatives)
+    if not routes:
+        raise HikingPlannerError(
+            "No hiking route connects those points. They may sit in separate valleys, "
+            "or an excluded area may cut the only link."
+        )
+
+    sess = session or requests.Session()
+    final: list[RouteCandidate] = []
+    for path in routes:
+        gs = path_graph_stats(graph, path)
+        car_share = gs["car_road_share_percent"] / 100.0
+        if car_share > config.max_car_road_share:
+            continue
+        try:
+            profile = fetch_elevation_profile(path, session=sess)
+            ps = profile_stats(profile, gs["distance_m"], window_m=config.steepness_window_m)
+        except Exception:
+            if reference_grade_limit is not None:
+                continue
+            profile = None
+            ps = {
+                "ascent_m": gs["ascent_m"],
+                "descent_m": gs["descent_m"],
+                "duration_minutes": gs["duration_minutes"],
+                "p95_grade_percent": 0.0,
+                "max_sustained_grade_percent": 0.0,
+            }
+
+        grade = float(ps["max_sustained_grade_percent"])
+        if reference_grade_limit is not None and grade > reference_grade_limit:
+            continue
+
+        official_penalty = max(0.0, 1.0 - gs["official_share_percent"] / 100.0)
+        stats = RouteStats(
+            distance_km=gs["distance_m"] / 1000.0,
+            ascent_m=float(ps["ascent_m"]),
+            descent_m=float(ps["descent_m"]),
+            duration_minutes=float(ps["duration_minutes"]),
+            max_sustained_grade_percent=grade,
+            p95_grade_percent=float(ps["p95_grade_percent"]),
+            official_share_percent=gs["official_share_percent"],
+            car_road_share_percent=gs["car_road_share_percent"],
+            major_road_m=gs["major_road_m"],
+        )
+        # Shortest first, then quieter and more official.
+        score = gs["duration_minutes"] / 60.0 + official_penalty * 2.4 + car_share * 3.5
+        final.append(
+            RouteCandidate(
+                nodes=path,
+                stats=stats,
+                score=score,
+                pivot=snapped[-1],
+                profile=profile,
+                road_spans=car_road_spans(graph, path),
+            )
+        )
+
+    if not final:
+        if reference_grade_limit is not None:
+            raise HikingPlannerError(
+                "A route exists, but none stayed within the reference steepness limit. "
+                "Raise the tolerance or switch the steepness reference off."
+            )
+        raise HikingPlannerError(
+            f"A route exists, but every variant spends more than "
+            f"{config.max_car_road_share * 100:.0f}% of its length on roads shared with cars."
+        )
+
+    final.sort(key=lambda c: c.score)
+    final = _order_by_diversity(
+        graph, final, config.diversity_weight, config.duplicate_similarity
+    )
+    return final, graph
+
+
 def compute_reference_grade(
     gpkg: Path,
     layer: str,
@@ -1210,12 +1515,18 @@ def compute_reference_grade(
     ref_end_latlon: tuple[float, float],
     config: PlannerConfig,
     session: requests.Session | None = None,
+    herding_dog_areas: Sequence[dict] | None = None,
 ) -> tuple[float, RouteStats, list[tuple[float, float]], list[dict]]:
     a = latlon_to_lv95(ref_start_latlon)
     b = latlon_to_lv95(ref_end_latlon)
     direct = math.hypot(b[0] - a[0], b[1] - a[1])
     bbox = _bbox_around_points([a, b], margin_m=max(2500.0, direct * 0.6))
-    gdf = load_hiking_lines(gpkg, layer, bbox, alpine_forbidden=config.alpine_forbidden)
+    exclusion = None
+    if config.avoid_herding_dogs and herding_dog_areas is not None:
+        exclusion = herding_dog_exclusion(herding_dog_areas, config.herding_dog_buffer_m)
+    gdf = load_hiking_lines(
+        gpkg, layer, bbox, alpine_forbidden=config.alpine_forbidden, exclusion=exclusion
+    )
     graph = build_graph(gdf, config)
     route = route_between(graph, a, b, config.max_snap_m)
     gs = path_graph_stats(graph, route)
@@ -1242,6 +1553,7 @@ def plan_loops(
     config: PlannerConfig,
     reference_grade_limit: float | None = None,
     session: requests.Session | None = None,
+    herding_dog_areas: Sequence[dict] | None = None,
 ) -> tuple[list[RouteCandidate], nx.Graph]:
     start = latlon_to_lv95(start_latlon)
     direction = latlon_to_lv95(direction_latlon)
@@ -1254,8 +1566,43 @@ def plan_loops(
     last_error: Exception | None = None
     for factor in (1.0, 1.35, 1.8):
         bbox = _bbox_around(start, radius_m * factor)
+        exclusion = None
+        if config.avoid_herding_dogs:
+            areas = herding_dog_areas
+            if areas is None:
+                # Fail closed: without the guarded-pasture layer we cannot promise the
+                # route avoids herding dogs, and quietly routing through one is exactly
+                # the outcome the setting exists to prevent.
+                try:
+                    areas = fetch_herding_dog_areas(bbox, session=session)
+                except Exception as exc:
+                    raise HikingPlannerError(
+                        "Could not load the federal herding-dog pasture layer "
+                        f"({exc}). Routes are not planned without it while "
+                        "'Avoid herding dog pastures' is on."
+                    ) from exc
+            exclusion = herding_dog_exclusion(areas, config.herding_dog_buffer_m)
+            if exclusion is not None and exclusion.contains(ShapelyPoint(*start)):
+                inside = [
+                    a["name"] for a in areas
+                    if a.get("geometry") is not None and a["geometry"].contains(ShapelyPoint(*start))
+                ]
+                where = f" ({', '.join(inside)})" if inside else ""
+                margin = (
+                    f" It is within the {config.herding_dog_buffer_m:.0f} m safety margin rather "
+                    "than the pasture itself, so reducing the margin would allow routing."
+                    if not inside
+                    else ""
+                )
+                raise HikingPlannerError(
+                    f"The start lies inside an alpine pasture guarded by livestock guardian "
+                    f"dogs{where}, so no route can leave it while those areas are excluded."
+                    f"{margin} Move the start, or switch off 'Avoid herding dog pastures'."
+                )
         try:
-            gdf = load_hiking_lines(gpkg, layer, bbox, alpine_forbidden=config.alpine_forbidden)
+            gdf = load_hiking_lines(
+                gpkg, layer, bbox, alpine_forbidden=config.alpine_forbidden, exclusion=exclusion
+            )
             graph = build_graph(gdf, config)
             candidates = generate_loop_candidates(
                 graph,
