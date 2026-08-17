@@ -53,6 +53,10 @@ Points come either from the official `geo.admin.ch` search index or from clickin
 places, so you can set the start, the destination and any number of waypoints, with
 *Undo waypoint* and *Clear all* to correct yourself.
 
+Waypoints can also be typed as coordinates in the *Waypoints* panel. The map needs
+Leaflet from a CDN, which some networks block; without the typed fallback waypoints would
+be unreachable there.
+
 ## Loop or one-way
 
 **Loop** (default) generates circular routes of the requested duration towards a

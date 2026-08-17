@@ -237,6 +237,34 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
     st.rerun()
 
 
+def waypoint_editor() -> None:
+    """Type waypoints as coordinates.
+
+    The map is the pleasant way to add them, but it needs Leaflet from a CDN. On a
+    restricted network that never loads, and waypoints would be unreachable with no
+    other way in.
+    """
+    current = picked("Waypoint")
+    with st.expander(f"Waypoints ({len(current)})", expanded=bool(current)):
+        for i, point in enumerate(current, start=1):
+            st.caption(f"{i}. {point[0]:.5f}, {point[1]:.5f}")
+        c1, c2, c3 = st.columns([2, 2, 1])
+        with c1:
+            lat = st.number_input("Latitude", value=46.7000000, format="%.7f", key="wp_lat")
+        with c2:
+            lon = st.number_input("Longitude", value=8.8500000, format="%.7f", key="wp_lon")
+        with c3:
+            st.caption("")
+            if st.button("Add", use_container_width=True, key="wp_add"):
+                st.session_state.setdefault("pick_waypoints", []).append(
+                    (round(float(lat), 6), round(float(lon), 6))
+                )
+                st.rerun()
+        if current and st.button("Remove all waypoints", key="wp_clear"):
+            st.session_state["pick_waypoints"] = []
+            st.rerun()
+
+
 def location_picker(label: str, default_query: str, key: str, manual_default: tuple[float, float] = (46.70, 8.85)) -> tuple[tuple[float, float] | None, str]:
     query = st.text_input(label, value=default_query, key=f"{key}_query")
     manual = st.toggle("Use manual coordinates", value=False, key=f"{key}_manual")
@@ -628,6 +656,8 @@ if input_mode == "Map":
     if direction_latlon:
         placed.append(f"{'destination' if not loop_mode else 'direction'} {direction_name}")
     st.caption(" · ".join(placed) if placed else "Click the map to place the start.")
+    if not loop_mode:
+        waypoint_editor()
 else:
     left, right = st.columns(2)
     with left:
@@ -639,8 +669,8 @@ else:
             "Destination" if not loop_mode else "Direction", "Disentis/Mustér", "direction"
         )
     if not loop_mode:
-        st.caption("Waypoints are placed on the map. Switch the input above to add some.")
         waypoints = list(picked("Waypoint"))
+        waypoint_editor()
 
 st.subheader("Steepness X")
 if use_reference:
