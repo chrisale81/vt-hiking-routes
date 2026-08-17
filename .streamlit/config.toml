@@ -1,0 +1,11 @@
+[server]
+# The swissTLM3D extract is fetched into the app's own cache, never uploaded.
+maxUploadSize = 5
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#ff4b4b"

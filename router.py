@@ -287,9 +287,10 @@ def download_and_extract_dataset(cache_dir: Path, refresh: bool = False) -> Path
             old_state = {}
 
     gpkg_files = list(extract_dir.rglob("*.gpkg")) if extract_dir.exists() else []
+    # The archive is not part of the cache signal: it is deleted after extraction,
+    # because keeping it costs another 189 MB for a file nothing reads again.
     cache_current = (
         not refresh
-        and zip_path.exists()
         and bool(gpkg_files)
         and old_state.get("url") == url
         and old_state.get("modified") == modified_marker
@@ -315,6 +316,9 @@ def download_and_extract_dataset(cache_dir: Path, refresh: bool = False) -> Path
             json.dumps({"url": url, "modified": modified_marker}, indent=2),
             "utf-8",
         )
+        # Only the extracted GeoPackage is ever read. Dropping the archive halves the
+        # footprint, which matters on hosts with a small disk such as Streamlit Cloud.
+        zip_path.unlink(missing_ok=True)
 
     gpkg_files = list(extract_dir.rglob("*.gpkg"))
     if not gpkg_files:

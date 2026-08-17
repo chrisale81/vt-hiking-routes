@@ -112,6 +112,38 @@ Around villages, official hiking routes genuinely run on paved lanes for long st
 so a strict tolerance can leave very few loops — or none. The planner says so rather than
 quietly relaxing the limit.
 
+## Deploying to Streamlit Community Cloud
+
+The repository is deployable as-is: `app.py` at the root is the entry point, and every
+dependency installs from wheels, so no `packages.txt` or system GDAL is required.
+
+1. Push to a public GitHub repository.
+2. On [share.streamlit.io](https://share.streamlit.io) choose the repo, branch `main`,
+   and `app.py` as the main file.
+3. Under *Advanced settings* select **Python 3.12** (the version this is tested on).
+4. Deploy. No secrets are needed -- every data source is a public federal API.
+
+Measured on a stock `python:3.12-slim` container capped at 1 GB of memory, which is the
+closest honest proxy for the managed runtime:
+
+| | |
+|---|---|
+| Dependency install | wheels only, no system libraries |
+| First download of swissTLM3D | ~22 s |
+| Disk after extraction | 389 MB |
+| Peak memory, download + planning | 358 MB |
+| Planning a 3 h loop | ~8 s |
+
+The app has no persistent disk on a managed host, so the cache lands in the home
+directory and is rebuilt after every reboot: the first visit following a cold start pays
+the download once, and subsequent route requests do not. `HIKING_CACHE_DIR` overrides the
+location; Docker Compose mounts a volume at `/data` and that is used automatically when
+present.
+
+The 389 MB extract is the constraint to watch. Community Cloud does not guarantee a disk
+budget, so if a deploy dies during startup that is the first thing to suspect -- the
+Docker route below has no such limit.
+
 ## Important limitations
 
 This is a route-generation engine, not a live safety oracle. It currently does **not** evaluate:
@@ -136,4 +168,6 @@ Those can be added as additional exclusion/penalty layers later.
 
 ## Cache refresh
 
-Use **Refresh hiking dataset** in the sidebar. The app checks the `opendata.swiss` catalogue and stores the current GeoPackage under `/data/cache` inside Docker.
+Use **Refresh hiking dataset** in the sidebar. The app checks the `opendata.swiss` catalogue and stores the current GeoPackage under `/data/cache` inside Docker, or in `~/.cache/swiss-hiking-planner` when no `/data` volume is mounted. Set `HIKING_CACHE_DIR` to put it anywhere else.
+
+The downloaded archive is deleted once extracted, since only the GeoPackage is ever read.

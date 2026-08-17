@@ -34,9 +34,22 @@ st.set_page_config(
     layout="wide",
 )
 
-CACHE_DIR = Path(os.environ.get("HIKING_CACHE_DIR", "/data/cache"))
-if not CACHE_DIR.parent.exists():
-    CACHE_DIR = Path.home() / ".cache" / "swiss-hiking-planner"
+def resolve_cache_dir() -> Path:
+    """Where the swissTLM3D extract lives.
+
+    Docker Compose mounts a volume at /data; a managed host such as Streamlit Cloud has
+    no such volume, so fall back to the home cache. Anything explicit wins over both.
+    """
+    explicit = os.environ.get("HIKING_CACHE_DIR")
+    if explicit:
+        return Path(explicit)
+    docker_volume = Path("/data")
+    if docker_volume.is_dir() and os.access(docker_volume, os.W_OK):
+        return docker_volume / "cache"
+    return Path.home() / ".cache" / "swiss-hiking-planner"
+
+
+CACHE_DIR = resolve_cache_dir()
 
 
 @st.cache_data(ttl=600, show_spinner=False)
