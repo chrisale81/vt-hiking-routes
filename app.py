@@ -158,6 +158,10 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
         "Waypoint": "Waypoint",
     }
 
+    pending = st.session_state.pop("pick_role_next", None)
+    if pending in roles:
+        st.session_state["pick_role"] = pending
+
     start, dest = picked("Start"), picked("Destination")
     second = labels["Destination"].lower()
     if not start:
@@ -192,6 +196,7 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
         if st.button("Clear all", use_container_width=True):
             for key in ("pick_start", "pick_destination", "pick_waypoints", "pick_last_click"):
                 st.session_state.pop(key, None)
+            st.session_state["pick_role_next"] = "Start"
             st.rerun()
 
     waypoints = picked("Waypoint")
@@ -271,8 +276,9 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
     st.session_state["pick_destination"] = after["destination"]
     st.session_state["pick_waypoints"] = after["waypoints"]
     st.session_state["pick_last_click"] = after["last"]
-    # Move to whatever still has to be placed, so the common path is just click, click.
-    st.session_state["pick_role"] = next_pick_role(after, roles)
+    # Hand the next role to the following run rather than writing "pick_role" here:
+    # the radio already exists by now, and Streamlit rejects writes to a live widget key.
+    st.session_state["pick_role_next"] = next_pick_role(after, roles)
     st.rerun()
 
 
