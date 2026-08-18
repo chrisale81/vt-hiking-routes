@@ -12,13 +12,14 @@
       "Chur German has no fixed spelling. Write it as it is spoken; consistency within the file matters more than any rule."
     ],
     "counts": {
-      "ui": 134,
+      "ui": 136,
       "errors": 37
     }
   },
   "app": {
     "title": "🥾 Bündner Wanderroute-Planer",
-    "tagline": "Offiziells swissTLM3D Wandernetz · Alpinwanderwäg sind gsperrt · GPX / GeoJSON Export"
+    "tagline": "Offiziells swissTLM3D Wandernetz · Alpinwanderwäg sind gsperrt · GPX / GeoJSON Export",
+    "page_title": "Bündner Wanderroute-Planer"
   },
   "sidebar": {
     "route_target": {
@@ -27,14 +28,14 @@
       "loop_help": "Wenn s uus isch, gits e Strecki vom Start über d Zwischepunkt zum Ziel.",
       "duration": "Wanderziit",
       "duration_help_loop": "Wie lang d Rundi öppa soll duure.",
-      "duration_help_oneway": "Bi ere Strecki spilts kei Rolle: Start und Ziel gäbid d Ziit vor.",
-      "alpine": "Alpinwanderwäg verbotte",
-      "alpine_help": "Alpinwanderwäg (wiiss-blau-wiiss) verlangid Trittsicherheit, Schwindelfreiheit und mängisch d Händ. Wenn dus uusnimmsch, sind sie erlaubt.",
-      "alpine_warning": "Alpini Route chönd usgsetzt oder gsicheret sii — nüt für en Hund.",
-      "duration_caption": "D Ziit rechnet nach de Schwiizer Wanderwäg-Regel, ohni Pause."
+      "duration_help_oneway": "Bi dära Strecki spilts kei Rolle: Start und Ziel gänd d Ziit vor.",
+      "alpine": "Alpinwanderwäg verbotta",
+      "alpine_help": "Alpinwanderwäg (wiiss-blau-wiiss) verlangend Trittsicherheit, Schwindelfreiheit und öppa d Händ. Wenn dus uusanimmsch, sinds erlaubt.",
+      "alpine_warning": "Alpini Route chönd usgsetzt oder gsicheret sii — nüt für an Hund.",
+      "duration_caption": "D Ziit rechnet nach de Schwiizer Wanderwäg-Regla, ohni Pausa."
     },
     "roads_dogs": {
-      "header": "Strasse und Hünd",
+      "header": "Strossa und Hünd",
       "avoid_dogs": "Alpe mit Herdeschutzhünd miide",
       "avoid_dogs_help": "Alpweide wo mit Herdeschutzhünd gschützt sind (BAFU-Layer ch.bafu.alpweiden-herdenschutzhunde). D Hünd gsehnd en fremde Hund als Gfahr für d Herde, drum wärdid die Gebiet us em Wegnetz uusegschnitte.",
       "road_share": "Max Aateil uf Strasse mit Auto",
@@ -160,7 +161,8 @@
     "profile_axis_elevation": "Höchi (m)",
     "download_gpx": "GPX abelade",
     "download_geojson": "GeoJSON abelade",
-    "download_zip": "Alli {count} als ZIP abelade"
+    "download_zip": "Alli {count} als ZIP abelade",
+    "export_track_name": "Bündner Wanderroute {number}"
   },
   "map": {
     "tooltip_route": "Brechneti Wanderroute",

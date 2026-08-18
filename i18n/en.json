@@ -11,7 +11,7 @@
       "Chur German has no fixed spelling. Write it as it is spoken; consistency within the file matters more than any rule."
     ],
     "counts": {
-      "ui": 134,
+      "ui": 136,
       "errors": 37
     }
   },
@@ -25,8 +25,9 @@
     "errors.point_in_pasture": "{point} is 'start', 'destination' or 'waypoint 2'. Those words come from errors.point_names below."
   },
   "app": {
-    "title": "🥾 Swiss Hiking Loop Planner dsd",
-    "tagline": "Official swissTLM3D hiking network · hard ban on alpine hiking trails · GPX / GeoJSON export"
+    "title": "🥾 Swiss Hiking Loop Planner",
+    "tagline": "Official swissTLM3D hiking network · hard ban on alpine hiking trails · GPX / GeoJSON export",
+    "page_title": "Swiss Hiking Loop Planner"
   },
   "sidebar": {
     "route_target": {
@@ -168,7 +169,8 @@
     "profile_axis_elevation": "Elevation (m)",
     "download_gpx": "Download GPX",
     "download_geojson": "Download GeoJSON",
-    "download_zip": "Download all {count} as ZIP"
+    "download_zip": "Download all {count} as ZIP",
+    "export_track_name": "Swiss hiking loop {number}"
   },
   "map": {
     "tooltip_route": "Generated hiking loop",

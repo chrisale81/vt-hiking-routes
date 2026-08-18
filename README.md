@@ -209,9 +209,13 @@ Docker route below has no such limit.
 
 ## Translations
 
-`i18n/en.json` holds every user-facing string in the app: 134 interface strings and 37
-error messages, grouped by where they appear. `i18n/gsw-chur.json` has the identical key
-structure with the English values still in place, ready to be overwritten.
+The interface speaks **Khurerdeutsch**. Every user-facing string lives in
+`i18n/gsw-chur.json`, with `i18n/en.json` kept as the English reference and as a fallback
+for any key the dialect file happens to miss. `i18n.py` loads them and `t("some.key")` is
+what the code calls; nothing is hardcoded in `app.py` or `router.py` any more.
+
+Wording can be corrected by editing the JSON alone -- no code change and no rebuild of the
+routing logic. That matters for a dialect with no settled spelling.
 
 Two things matter when translating:
 
@@ -222,8 +226,9 @@ Two things matter when translating:
 Official names are left untranslated: swissTLM3D, Wanderweg, Bergwanderweg,
 Alpinwanderweg, Herdenschutzhunde, BAFU, swisstopo.
 
-The files are the text inventory. The app does not read them yet -- it still has its
-strings inline.
+Four tests guard the catalogues: every reference key is translated, the key sets match,
+placeholders survive translation, and no English literal sneaks back into a `st.*` call or
+an error message.
 
 ## Important limitations
 

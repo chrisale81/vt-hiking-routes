@@ -10,7 +10,8 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY router.py app.py ./
+COPY router.py app.py i18n.py ./
+COPY i18n ./i18n
 
 RUN mkdir -p /data/cache
 

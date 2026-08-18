@@ -1,7 +1,20 @@
 import math
+import re
 
 import networkx as nx
 import pytest
+
+import i18n
+
+
+def message_fragment(key: str) -> str:
+    """The longest literal chunk of a catalogue message.
+
+    Tests match on this rather than on hardcoded wording, so re-phrasing a translation
+    does not break them.
+    """
+    raw = i18n._catalogue(i18n.LANGUAGE)[key]
+    return max(re.split(r"\{[^}]*\}", raw), key=len).strip()
 
 from router import (
     CATEGORY_ALPIN,
@@ -317,7 +330,8 @@ def test_car_road_tolerance_rejects_road_heavy_loops():
     )
 
     strict = router.PlannerConfig(max_car_road_share=0.10, **base)
-    with pytest.raises(router.HikingPlannerError, match="roads shared with cars"):
+    expected = re.escape(message_fragment("errors.loops_too_much_road"))
+    with pytest.raises(router.HikingPlannerError, match=expected):
         router.generate_loop_candidates(g, s, (3000.0, 0.0), strict)
 
     # With the tolerance raised the same loop is offered, and reports its road share.

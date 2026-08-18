@@ -12,6 +12,7 @@ import requests
 import streamlit as st
 from streamlit_folium import st_folium
 
+from i18n import t
 from router import (
     HikingPlannerError,
     LocationResult,
@@ -33,7 +34,7 @@ from router import (
 
 
 st.set_page_config(
-    page_title="Swiss Hiking Loop Planner",
+    page_title=t("app.page_title"),
     page_icon="🥾",
     layout="wide",
 )
@@ -153,9 +154,9 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
     """Click the map to place the start, the destination and any waypoints."""
     roles = ["Start", "Destination", "Waypoint"] if not loop_mode else ["Start", "Destination"]
     labels = {
-        "Start": "Start",
-        "Destination": "Direction target" if loop_mode else "Destination",
-        "Waypoint": "Waypoint",
+        "Start": t("points.map.role_start"),
+        "Destination": t("points.map.role_direction") if loop_mode else t("points.map.role_destination"),
+        "Waypoint": t("points.map.role_waypoint"),
     }
 
     pending = st.session_state.pop("pick_role_next", None)
@@ -165,35 +166,32 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
     start, dest = picked("Start"), picked("Destination")
     second = labels["Destination"].lower()
     if not start:
-        st.info(f"**Step 1 of 2** — click the map to place the **start**. "
-                f"The picker then moves on to the {second} by itself.")
+        st.info(t("points.map.step1", second=second))
     elif not dest:
-        st.info(f"**Step 2 of 2** — now click the **{second}**"
-                + (", which sets the direction the loop should head in." if loop_mode
-                   else ", where the route should end."))
+        st.info(t("points.map.step2_loop" if loop_mode else "points.map.step2_oneway", second=second))
     else:
         st.success(
-            f"Start and {second} are set — press "
-            f"**{'Generate hiking loops' if loop_mode else 'Plan the route'}** below."
-            + ("" if loop_mode else " Add waypoints first if you want the route to pass by them.")
+            t("points.map.ready",
+              second=second,
+              button=t("actions.generate_loops") if loop_mode else t("actions.plan_route"))
+            + ("" if loop_mode else t("points.map.ready_waypoint_hint"))
         )
 
     controls, actions = st.columns([3, 1])
     with controls:
         role = st.radio(
-            "Next click places",
+            t("points.map.next_click"),
             roles,
             format_func=lambda r: labels[r],
             horizontal=True,
             key="pick_role",
-            help="Each click places this kind of point. It advances automatically once "
-                 "the start and the second point are set.",
+            help=t("points.map.next_click_help"),
         )
     with actions:
-        if st.button("Undo waypoint", use_container_width=True, disabled=not picked("Waypoint")):
+        if st.button(t("points.map.undo"), use_container_width=True, disabled=not picked("Waypoint")):
             st.session_state["pick_waypoints"].pop()
             st.rerun()
-        if st.button("Clear all", use_container_width=True):
+        if st.button(t("points.map.clear"), use_container_width=True):
             for key in ("pick_start", "pick_destination", "pick_waypoints", "pick_last_click"):
                 st.session_state.pop(key, None)
             st.session_state["pick_role_next"] = "Start"
@@ -211,7 +209,7 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
             herding_areas = cached_herding_areas((cx - span, cy - span, cx + span, cy + span))
         except Exception as exc:
             herding_areas = []
-            st.caption(f"Herding dog pastures could not be loaded for the map ({exc}).")
+            st.caption(t("points.map.pastures_failed", error=exc))
 
     m = folium.Map(location=list(centre), zoom_start=12, tiles=None, control_scale=True)
     folium.TileLayer(
@@ -220,7 +218,7 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
             "ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg"
         ),
         attr="© swisstopo",
-        name="swisstopo",
+        name=t("map.layer_swisstopo"),
         max_zoom=18,
     ).add_to(m)
     add_herding_dog_layer(m, herding_areas)
@@ -238,11 +236,11 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
         ).add_to(m)
 
     if start:
-        pin(start, "#2ca02c", "Start")
+        pin(start, "#2ca02c", t("map.tooltip_start"))
     if dest:
         pin(dest, "#d62728", labels["Destination"])
     for i, point in enumerate(waypoints, start=1):
-        pin(point, "#1f77b4", f"Waypoint {i}")
+        pin(point, "#1f77b4", t("map.tooltip_waypoint", number=i))
 
     placed = [p for p in ([start] + list(waypoints) + [dest]) if p]
     if len(placed) > 1:
@@ -290,55 +288,55 @@ def waypoint_editor() -> None:
     other way in.
     """
     current = picked("Waypoint")
-    with st.expander(f"Waypoints ({len(current)})", expanded=bool(current)):
+    with st.expander(t("points.waypoints.expander", count=len(current)), expanded=bool(current)):
         for i, point in enumerate(current, start=1):
-            st.caption(f"{i}. {point[0]:.5f}, {point[1]:.5f}")
+            st.caption(t("points.waypoints.listed", index=i, lat=f"{point[0]:.5f}", lon=f"{point[1]:.5f}"))
         c1, c2, c3 = st.columns([2, 2, 1])
         with c1:
-            lat = st.number_input("Latitude", value=46.7000000, format="%.7f", key="wp_lat")
+            lat = st.number_input(t("points.waypoints.latitude"), value=46.7000000, format="%.7f", key="wp_lat")
         with c2:
-            lon = st.number_input("Longitude", value=8.8500000, format="%.7f", key="wp_lon")
+            lon = st.number_input(t("points.waypoints.longitude"), value=8.8500000, format="%.7f", key="wp_lon")
         with c3:
             st.caption("")
-            if st.button("Add", use_container_width=True, key="wp_add"):
+            if st.button(t("points.waypoints.add"), use_container_width=True, key="wp_add"):
                 st.session_state.setdefault("pick_waypoints", []).append(
                     (round(float(lat), 6), round(float(lon), 6))
                 )
                 st.rerun()
-        if current and st.button("Remove all waypoints", key="wp_clear"):
+        if current and st.button(t("points.waypoints.remove_all"), key="wp_clear"):
             st.session_state["pick_waypoints"] = []
             st.rerun()
 
 
 def location_picker(label: str, default_query: str, key: str, manual_default: tuple[float, float] = (46.70, 8.85)) -> tuple[tuple[float, float] | None, str]:
     query = st.text_input(label, value=default_query, key=f"{key}_query")
-    manual = st.toggle("Use manual coordinates", value=False, key=f"{key}_manual")
+    manual = st.toggle(t("points.search.manual_toggle"), value=False, key=f"{key}_manual")
 
     if manual:
         c1, c2 = st.columns(2)
         with c1:
-            lat = st.number_input("Latitude", value=float(manual_default[0]), format="%.7f", key=f"{key}_lat")
+            lat = st.number_input(t("points.search.latitude"), value=float(manual_default[0]), format="%.7f", key=f"{key}_lat")
         with c2:
-            lon = st.number_input("Longitude", value=float(manual_default[1]), format="%.7f", key=f"{key}_lon")
+            lon = st.number_input(t("points.search.longitude"), value=float(manual_default[1]), format="%.7f", key=f"{key}_lon")
         return (float(lat), float(lon)), f"{lat:.6f}, {lon:.6f}"
 
     if not query.strip():
-        st.caption("Enter a Swiss place, address or mapped name.")
+        st.caption(t("points.search.enter_place"))
         return None, ""
 
     try:
         raw = cached_search(query.strip())
         results = [LocationResult(**x) for x in raw]
     except Exception as exc:
-        st.error(f"Swiss location search failed: {exc}")
+        st.error(t("errors.search_failed", error=exc))
         return None, ""
 
     if not results:
-        st.warning("No official geo.admin.ch location result. Refine the name or switch to manual coordinates.")
+        st.warning(t("points.search.no_result"))
         return None, ""
 
     options = {f"{r.display}  [{r.lat:.5f}, {r.lon:.5f}]": r for r in results}
-    selected_label = st.selectbox("Resolved location", list(options.keys()), key=f"{key}_select")
+    selected_label = st.selectbox(t("points.search.resolved"), list(options.keys()), key=f"{key}_select")
     selected = options[selected_label]
     return selected.latlon, selected.display
 
@@ -383,8 +381,8 @@ def elevation_chart(frame: pd.DataFrame, marker_km: float | None) -> alt.Chart:
     padding = max((high - low) * 0.12, 5.0)
     domain = [low - padding, high + padding]
 
-    x = alt.X("km:Q", title="Distance (km)", scale=alt.Scale(nice=False, domain=[0, float(frame["km"].max())]))
-    y = alt.Y("elevation:Q", title="Elevation (m)", scale=alt.Scale(domain=domain, nice=False, clamp=True))
+    x = alt.X("km:Q", title=t("results.profile_axis_distance"), scale=alt.Scale(nice=False, domain=[0, float(frame["km"].max())]))
+    y = alt.Y("elevation:Q", title=t("results.profile_axis_elevation"), scale=alt.Scale(domain=domain, nice=False, clamp=True))
 
     base = alt.Chart(frame)
     area = base.mark_area(
@@ -447,16 +445,16 @@ def add_herding_dog_layer(m, cached_areas):
     """Draw the guarded pastures so it is visible why a route detours around them."""
     if not cached_areas:
         return
-    group = folium.FeatureGroup(name="Herding dog pastures", show=True)
+    group = folium.FeatureGroup(name=t("map.layer_pastures"), show=True)
     for area in cached_areas:
         contact = " · ".join(
             str(v) for v in (area.get("contact_name"), area.get("contact_phone"), area.get("contact_email")) if v
         )
-        popup = f"<b>{area.get('name', 'Alpweide')}</b><br>Livestock guardian dogs — do not enter with a dog."
+        popup = t("map.pasture_popup", name=area.get("name", "Alpweide"))
         if contact:
-            popup += f"<br>Contact: {contact}"
+            popup += "<br>" + t("map.pasture_contact", contact=contact)
         if area.get("url"):
-            popup += f"<br><a href='{area['url']}' target='_blank'>Official pasture map</a>"
+            popup += f"<br><a href='{area['url']}' target='_blank'>{t('map.pasture_link')}</a>"
         folium.GeoJson(
             area["geojson"],
             style_function=lambda _: {
@@ -466,7 +464,7 @@ def add_herding_dog_layer(m, cached_areas):
                 "fillOpacity": 0.30,
                 "dashArray": "5,5",
             },
-            tooltip=f"{area.get('name', 'Alpweide')} — herding dogs",
+            tooltip=t("map.pasture_tooltip", name=area.get("name", "Alpweide")),
             popup=folium.Popup(popup, max_width=320),
         ).add_to(group)
     group.add_to(m)
@@ -482,27 +480,27 @@ def route_map(candidate, start_latlon, direction_latlon, frame=None, marker_km=N
             "ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg"
         ),
         attr="© swisstopo",
-        name="swisstopo",
+        name=t("map.layer_swisstopo"),
         max_zoom=18,
     ).add_to(m)
     add_herding_dog_layer(m, herding_areas)
-    folium.PolyLine(route, weight=6, opacity=0.9, tooltip="Generated hiking loop").add_to(m)
+    folium.PolyLine(route, weight=6, opacity=0.9, tooltip=t("map.tooltip_route")).add_to(m)
 
     road_spans = getattr(candidate, "road_spans", None) or []
     if road_spans:
-        roads = folium.FeatureGroup(name="Shared with cars", show=True)
+        roads = folium.FeatureGroup(name=t("results.metric_cars"), show=True)
         for span in road_spans:
             folium.PolyLine(
                 route_latlon(span),
                 weight=7,
                 opacity=0.95,
                 color="#d62728",
-                tooltip="Shared with cars — keep the dog on the lead",
+                tooltip=t("map.tooltip_road"),
             ).add_to(roads)
         roads.add_to(m)
 
     if frame is not None and not frame.empty:
-        ticks = folium.FeatureGroup(name="Kilometre marks", show=True)
+        ticks = folium.FeatureGroup(name=t("map.layer_km"), show=True)
         for km in range(1, int(frame["km"].max()) + 1):
             point = frame.iloc[(frame["km"] - km).abs().argmin()]
             folium.CircleMarker(
@@ -513,20 +511,20 @@ def route_map(candidate, start_latlon, direction_latlon, frame=None, marker_km=N
                 fill=True,
                 fill_color="#1f77b4",
                 fill_opacity=1.0,
-                tooltip=f"km {km} · {float(point['elevation']):.0f} m",
+                tooltip=t("map.tooltip_km", number=km, elevation=f"{float(point['elevation']):.0f}"),
             ).add_to(ticks)
         ticks.add_to(m)
 
     folium.Marker(
-        start_latlon, tooltip="Start", icon=folium.Icon(color="green", icon="home", prefix="fa")
+        start_latlon, tooltip=t("map.tooltip_start"), icon=folium.Icon(color="green", icon="home", prefix="fa")
     ).add_to(m)
     for i, point in enumerate(waypoints or (), start=1):
         folium.Marker(
-            point, tooltip=f"Waypoint {i}", icon=folium.Icon(color="blue", icon="location-dot", prefix="fa")
+            point, tooltip=t("map.tooltip_waypoint", number=i), icon=folium.Icon(color="blue", icon="location-dot", prefix="fa")
         ).add_to(m)
     folium.Marker(
         direction_latlon,
-        tooltip="Direction target" if loop else "Destination",
+        tooltip=t("map.tooltip_direction") if loop else t("map.tooltip_destination"),
         icon=folium.Icon(color="red", icon="compass" if loop else "flag-checkered", prefix="fa"),
     ).add_to(m)
 
@@ -554,23 +552,23 @@ def zip_candidates(candidates) -> bytes:
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for i, c in enumerate(candidates, start=1):
             name = f"route_{i}"
-            zf.writestr(f"{name}.gpx", candidate_gpx(c, f"Swiss hiking loop {i}"))
-            zf.writestr(f"{name}.geojson", candidate_geojson(c, f"Swiss hiking loop {i}"))
+            zf.writestr(f"{name}.gpx", candidate_gpx(c, t("results.export_track_name", number=i)))
+            zf.writestr(f"{name}.geojson", candidate_geojson(c, t("results.export_track_name", number=i)))
     return buffer.getvalue()
 
 
-st.title("🥾 Swiss Hiking Loop Planner")
-st.caption("Official swissTLM3D hiking network · hard ban on alpine hiking trails · GPX / GeoJSON export")
+st.title(t("app.title"))
+st.caption(t("app.tagline"))
 
 with st.sidebar:
-    st.header("Route target")
+    st.header(t("sidebar.route_target.header"))
     loop_mode = st.checkbox(
-        "Loop",
+        t("sidebar.route_target.loop"),
         value=True,
-        help="Off plans a one-way route from the start, through any waypoints, to a destination.",
+        help=t("sidebar.route_target.loop_help"),
     )
     duration = st.slider(
-        "Duration",
+        t("sidebar.route_target.duration"),
         min_value=1.0,
         max_value=7.0,
         value=3.0,
@@ -578,48 +576,43 @@ with st.sidebar:
         format="%.2f h",
         disabled=not loop_mode,
         help=(
-            "Target length of the loop."
+            t("sidebar.route_target.duration_help_loop")
             if loop_mode
-            else "Ignored for a one-way route: the endpoints decide how long it is."
+            else t("sidebar.route_target.duration_help_oneway")
         ),
     )
     alpine_forbidden = st.checkbox(
-        "Alpine hiking trails forbidden",
+        t("sidebar.route_target.alpine"),
         value=True,
         help=(
-            "Alpinwanderweg (white-blue-white) demands sure-footedness, a head for heights "
-            "and sometimes hands. Unticking allows them."
+            t("sidebar.route_target.alpine_help")
         ),
     )
     if not alpine_forbidden:
-        st.warning("Alpine routes may include exposed or secured terrain, unsuitable for dogs.")
-    st.caption("Duration uses the Swiss Hiking Trails rule and excludes breaks.")
+        st.warning(t("sidebar.route_target.alpine_warning"))
+    st.caption(t("sidebar.route_target.duration_caption"))
 
-    st.header("Roads and dogs")
+    st.header(t("sidebar.roads_dogs.header"))
     avoid_herding_dogs = st.checkbox(
-        "Avoid herding dog pastures",
+        t("sidebar.roads_dogs.avoid_dogs"),
         value=True,
         help=(
-            "Alpine pastures guarded by livestock guardian dogs (BAFU layer "
-            "ch.bafu.alpweiden-herdenschutzhunde). The dogs treat an approaching dog as "
-            "a threat to the herd, so these areas are cut out of the route network."
+            t("sidebar.roads_dogs.avoid_dogs_help")
         ),
     )
     road_tolerance_pct = st.slider(
-        "Max share on roads with cars",
+        t("sidebar.roads_dogs.road_share"),
         min_value=0,
         max_value=40,
         value=20,
         step=1,
         format="%d%%",
         help=(
-            "Roads shared with motor traffic are avoided as far as the network allows. "
-            "This is how much of the loop may still run on one - a loop usually has to "
-            "leave the village somehow."
+            t("sidebar.roads_dogs.road_share_help")
         ),
     )
     herding_margin_m = st.slider(
-        "Safety margin around pastures",
+        t("sidebar.roads_dogs.margin"),
         min_value=0,
         max_value=200,
         value=0,
@@ -627,62 +620,61 @@ with st.sidebar:
         format="%d m",
         disabled=not avoid_herding_dogs,
         help=(
-            "Extra distance kept clear of the mapped pasture boundary. Note that a margin "
-            "can swallow a trailhead that sits close to a boundary, which makes every "
-            "route from it impossible."
+            t("sidebar.roads_dogs.margin_help")
         ),
     )
-    st.caption("Width and driving bans come from swissTLM3D; farm tracks closed to cars do not count.")
+    st.caption(t("sidebar.roads_dogs.caption"))
 
-    st.header("Steepness reference")
-    use_reference = st.checkbox("Limit steepness to reference route", value=True)
+    st.header(t("sidebar.steepness.header"))
+    use_reference = st.checkbox(t("sidebar.steepness.limit"), value=True)
 
-    with st.expander("Advanced routing", expanded=False):
+    with st.expander(t("sidebar.advanced.header"), expanded=False):
         other_penalty = st.slider(
-            "Penalty for ‘andere’ paths",
+            t("sidebar.advanced.other_penalty"),
             min_value=1.0,
             max_value=20.0,
             value=8.0,
             step=0.5,
-            help="Higher means official Wanderweg/Bergwanderweg segments are preferred more strongly.",
+            help=t("sidebar.advanced.other_penalty_help"),
         )
         steepness_tolerance_pct = st.slider(
-            "Reference steepness tolerance",
+            t("sidebar.advanced.steepness_tolerance"),
             min_value=0,
             max_value=25,
             value=5,
             step=1,
         )
-        direction_cone = st.slider("Direction cone", 30, 120, 75, 5, format="%d°")
-        repeated_pct = st.slider("Maximum repeated trail", 5, 50, 28, 1, format="%d%%")
-        candidate_pivots = st.slider("Turnaround points to evaluate", 6, 48, 28, 1)
+        direction_cone = st.slider(t("sidebar.advanced.direction_cone"), 30, 120, 75, 5, format="%d°")
+        repeated_pct = st.slider(t("sidebar.advanced.repeated"), 5, 50, 28, 1, format="%d%%")
+        candidate_pivots = st.slider(t("sidebar.advanced.pivots"), 6, 48, 28, 1)
         duration_tolerance_pct = st.slider(
-            "Duration tolerance",
+            t("sidebar.advanced.duration_tolerance"),
             min_value=5,
             max_value=50,
             value=30,
             step=5,
             format="%d%%",
-            help="Loops whose measured walking time misses the target by more than this are discarded.",
+            help=t("sidebar.advanced.duration_tolerance_help"),
         )
-        route_count = st.slider("Routes to show", 1, 10, 7, 1)
+        route_count = st.slider(t("sidebar.advanced.route_count"), 1, 10, 7, 1)
 
     if "refresh_counter" not in st.session_state:
         st.session_state.refresh_counter = 0
-    if st.button("Refresh hiking dataset"):
+    if st.button(t("sidebar.dataset.refresh_button")):
         st.session_state.refresh_counter += 1
         cached_dataset.clear()
-        st.success("A fresh opendata.swiss download will be used on the next route calculation.")
+        st.success(t("sidebar.dataset.refresh_done"))
 
 waypoints: list[tuple[float, float]] = []
 
-st.subheader("Start and destination" if not loop_mode else "Start and direction")
+st.subheader(t("points.heading_oneway") if not loop_mode else t("points.heading_loop"))
 input_mode = st.radio(
-    "Choose points by",
+    t("points.choose_by"),
     ["Search", "Map"],
+    format_func=lambda m: t("points.mode_search") if m == "Search" else t("points.mode_map"),
     horizontal=True,
     key="input_mode",
-    help="Search uses the official geo.admin.ch index. Map lets you click any spot.",
+    help=t("points.choose_by_help"),
 )
 
 if input_mode == "Map":
@@ -695,12 +687,12 @@ if input_mode == "Map":
 
     placed = []
     if start_latlon:
-        placed.append(f"start {start_name}")
+        placed.append(t("points.map.summary_start", coords=start_name))
     if waypoints:
-        placed.append(f"{len(waypoints)} waypoint(s)")
+        placed.append(t("points.map.summary_waypoints", count=len(waypoints)))
     if direction_latlon:
-        placed.append(f"{'destination' if not loop_mode else 'direction'} {direction_name}")
-    st.caption(" · ".join(placed) if placed else "Click the map to place the start.")
+        placed.append(t("points.map.summary_destination" if not loop_mode else "points.map.summary_direction", coords=direction_name))
+    st.caption(" · ".join(placed) if placed else t("points.map.empty_hint"))
     if not loop_mode:
         waypoint_editor()
 else:
@@ -717,17 +709,17 @@ else:
         waypoints = list(picked("Waypoint"))
         waypoint_editor()
 
-st.subheader("Steepness X")
+st.subheader(t("steepness.heading"))
 if use_reference:
     ref_left, ref_right = st.columns(2)
     with ref_left:
-        ref_start_latlon, ref_start_name = location_picker("Reference start", "Sontga Gada", "ref_start")
+        ref_start_latlon, ref_start_name = location_picker(t("steepness.ref_start"), "Sontga Gada", "ref_start")
     with ref_right:
-        ref_end_latlon, ref_end_name = location_picker("Reference end", "Mumpé Medel", "ref_end")
+        ref_end_latlon, ref_end_name = location_picker(t("steepness.ref_end"), "Mumpé Medel", "ref_end")
 else:
     ref_start_latlon = ref_end_latlon = None
     ref_start_name = ref_end_name = ""
-    st.info("Steepness limit is off. Routes still report their measured steepness.")
+    st.info(t("steepness.off_notice"))
 
 config = PlannerConfig(
     duration_hours=float(duration),
@@ -746,34 +738,34 @@ config = PlannerConfig(
 second_label = "direction target" if loop_mode else "destination"
 missing = []
 if start_latlon is None:
-    missing.append("a start")
+    missing.append(t("actions.missing_start"))
 if direction_latlon is None:
-    missing.append(f"a {second_label}")
+    missing.append(t("actions.missing_second", second=second_label))
 if use_reference and (ref_start_latlon is None or ref_end_latlon is None):
-    missing.append("both ends of the steepness reference route")
+    missing.append(t("actions.missing_reference"))
 ready = not missing
 
 st.divider()
 if missing:
     # A greyed-out button with no reason is the most common way to get stuck here.
     st.warning(
-        "Still needed before routes can be calculated: "
+        t("actions.missing_prefix")
         + ", ".join(missing)
         + ("." if input_mode == "Search" else
-           ". On the map, place each one by picking it under *Next click places*, then clicking.")
+           t("actions.missing_map_hint"))
     )
-button_label = "Generate hiking loops" if loop_mode else "Plan the route"
+button_label = t("actions.generate_loops") if loop_mode else t("actions.plan_route")
 if st.button(button_label, type="primary", disabled=not ready, use_container_width=True):
     try:
-        with st.status("Preparing official hiking data…", expanded=True) as status:
+        with st.status(t("status.preparing"), expanded=True) as status:
             gpkg_str, layer = cached_dataset(str(CACHE_DIR), st.session_state.refresh_counter)
             gpkg = Path(gpkg_str)
-            st.write(f"Using layer: `{layer}`")
+            st.write(t("status.using_layer", layer=layer))
 
             herding_cached: list[dict] = []
             herding_lv95: list[dict] | None = None
             if avoid_herding_dogs:
-                status.update(label="Loading herding dog pastures…")
+                status.update(label=t("status.loading_pastures"))
                 # One generous bbox around start and direction covers every search
                 # radius plan_loops tries, so the federal layer is fetched once.
                 sx, sy = latlon_to_lv95(start_latlon)
@@ -786,15 +778,15 @@ if st.button(button_label, type="primary", disabled=not ready, use_container_wid
                 herding_cached = cached_herding_areas(herding_bbox)
                 herding_lv95 = herding_areas_lv95(herding_cached)
                 st.write(
-                    f"{len(herding_cached)} guarded pasture(s) in range — excluded from routing."
+                    t("status.pastures_found", count=len(herding_cached))
                     if herding_cached
-                    else "No guarded pastures recorded in range."
+                    else t("status.pastures_none")
                 )
 
             reference_limit = None
             reference_stats = None
             if use_reference:
-                status.update(label="Measuring reference steepness…")
+                status.update(label=t("status.measuring_reference"))
                 reference_limit, reference_stats, _, _ = compute_reference_grade(
                     gpkg,
                     layer,
@@ -804,13 +796,14 @@ if st.button(button_label, type="primary", disabled=not ready, use_container_wid
                     herding_dog_areas=herding_lv95,
                 )
                 st.write(
-                    f"Reference: {ref_start_name} → {ref_end_name}: "
-                    f"{reference_stats.max_sustained_grade_percent:.1f}% sustained max; "
-                    f"allowed {reference_limit:.1f}% with tolerance."
+                    t("status.reference_line",
+                      **{"from": ref_start_name, "to": ref_end_name,
+                         "measured": f"{reference_stats.max_sustained_grade_percent:.1f}",
+                         "limit": f"{reference_limit:.1f}"})
                 )
 
             if loop_mode:
-                status.update(label="Searching loops toward the requested direction…")
+                status.update(label=t("status.searching_loops"))
                 candidates, _ = plan_loops(
                     gpkg,
                     layer,
@@ -822,7 +815,7 @@ if st.button(button_label, type="primary", disabled=not ready, use_container_wid
                 )
             else:
                 status.update(
-                    label=f"Routing to the destination via {len(waypoints)} waypoint(s)…"
+                    label=t("status.routing_oneway", count=len(waypoints))
                 )
                 candidates, _ = plan_point_to_point(
                     gpkg,
@@ -834,7 +827,7 @@ if st.button(button_label, type="primary", disabled=not ready, use_container_wid
                     reference_grade_limit=reference_limit,
                     herding_dog_areas=herding_lv95,
                 )
-            status.update(label="Routes ready", state="complete", expanded=False)
+            status.update(label=t("status.ready"), state="complete", expanded=False)
 
         st.session_state["candidates"] = candidates[:route_count]
         st.session_state["reference_stats"] = reference_stats
@@ -860,26 +853,26 @@ if candidates:
     if herding_areas:
         names = ", ".join(sorted({str(a.get("name")) for a in herding_areas if a.get("name")})[:6])
         st.warning(
-            f"**Herding dogs: {len(herding_areas)} guarded pasture(s) nearby** — {names}"
-            f"{' …' if len(herding_areas) > 6 else ''}. These are cut out of the routes and "
-            "shaded orange on the map. Livestock guardian dogs defend the herd against "
-            "approaching dogs, so do not enter them with one. Grazing is seasonal and the "
-            "federal layer can lag reality — check "
-            "[protectiondestroupeaux.ch](https://www.protectiondestroupeaux.ch/) before you go."
+            t("warnings.herding_nearby",
+              count=len(herding_areas),
+              names=names,
+              more=" …" if len(herding_areas) > 6 else "")
         )
     elif st.session_state.get("herding_checked"):
-        st.success("No pastures with livestock guardian dogs are recorded around these routes.")
+        st.success(t("warnings.herding_none"))
 
     if reference_stats is not None:
         st.info(
-            f"Steepness ceiling: **{reference_limit:.1f}% over a 50 m window** "
-            f"(reference measured at {reference_stats.max_sustained_grade_percent:.1f}%)."
+            t("steepness.ceiling",
+              limit=f"{reference_limit:.1f}",
+              measured=f"{reference_stats.max_sustained_grade_percent:.1f}")
         )
 
     # Only the selected route is rendered. st.tabs keeps inactive tab bodies in the
     # DOM but hidden, which makes Leaflet measure a zero-size viewport and never
     # load tiles for routes 2 and 3.
     labels = [f"Route {i}" for i in range(1, len(candidates) + 1)]
+    shown = {label: t("results.route_label", number=i) for i, label in enumerate(labels, start=1)}
     if st.session_state.get("selected_route") not in labels:
         st.session_state.pop("selected_route", None)
     # st.radio rather than st.segmented_control: the latter clears the selection
@@ -897,27 +890,30 @@ if candidates:
 
     s = candidate.stats
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Duration", f"{s.duration_minutes / 60:.2f} h")
-    c2.metric("Distance", f"{s.distance_km:.1f} km")
-    c3.metric("Ascent", f"{s.ascent_m:.0f} m")
-    c4.metric("Max 50 m grade", f"{s.max_sustained_grade_percent:.1f}%")
-    c5.metric("Official paths", f"{s.official_share_percent:.0f}%")
+    c1.metric(t("sidebar.route_target.duration"), f"{s.duration_minutes / 60:.2f} h")
+    c2.metric(t("results.metric_distance"), f"{s.distance_km:.1f} km")
+    c3.metric(t("results.metric_ascent"), f"{s.ascent_m:.0f} m")
+    c4.metric(t("results.metric_grade"), f"{s.max_sustained_grade_percent:.1f}%")
+    c5.metric(t("results.metric_official"), f"{s.official_share_percent:.0f}%")
     c6.metric(
-        "Shared with cars",
+        t("results.metric_cars"),
         f"{s.car_road_share_percent:.0f}%",
-        help="Share of the loop on roads open to motor traffic, drawn in red on the map.",
+        help=t("results.metric_cars_help"),
     )
 
     road_note = (
-        f"car-shared road {s.car_road_share_percent * s.distance_km * 10:.0f} m"
+        t("results.road_note_some", metres=f"{s.car_road_share_percent * s.distance_km * 10:.0f}")
         if s.car_road_share_percent
-        else "no road shared with cars"
+        else t("results.road_note_none")
     )
     if s.major_road_m > 0:
-        road_note += f" (of which {s.major_road_m:.0f} m on a road 6 m or wider)"
+        road_note += t("results.road_note_major", metres=f"{s.major_road_m:.0f}")
     st.caption(
-        f"Descent {s.descent_m:.0f} m · repeated trail {s.repeated_share_percent:.1f}% · "
-        f"95th-percentile sampled grade {s.p95_grade_percent:.1f}% · {road_note}"
+        t("results.detail_caption",
+          descent=f"{s.descent_m:.0f}",
+          repeated=f"{s.repeated_share_percent:.1f}",
+          p95=f"{s.p95_grade_percent:.1f}",
+          road_note=road_note)
     )
 
     profile = profile_frame(candidate.profile)
@@ -948,13 +944,15 @@ if candidates:
 
     if profile is not None:
         if marker_km is None:
-            st.caption("Click the elevation profile to mark that spot on the map.")
+            st.caption(t("results.profile_hint"))
         else:
             point = profile.iloc[(profile["km"] - marker_km).abs().argmin()]
             st.caption(
-                f"Marked: **{float(point['km']):.2f} km** into the loop at "
-                f"**{float(point['elevation']):.0f} m** "
-                f"({float(point['lat']):.5f}, {float(point['lon']):.5f}) — shown in red on the map."
+                t("results.profile_marked",
+                  km=f"{float(point['km']):.2f}",
+                  elevation=f"{float(point['elevation']):.0f}",
+                  lat=f"{float(point['lat']):.5f}",
+                  lon=f"{float(point['lon']):.5f}")
             )
 
         event = st.altair_chart(
@@ -973,23 +971,23 @@ if candidates:
     d1, d2 = st.columns(2)
     with d1:
         st.download_button(
-            "Download GPX",
-            data=candidate_gpx(candidate, f"Swiss hiking loop {idx}"),
+            t("results.download_gpx"),
+            data=candidate_gpx(candidate, t("results.export_track_name", number=idx)),
             file_name=f"hiking_loop_{idx}.gpx",
             mime="application/gpx+xml",
             use_container_width=True,
         )
     with d2:
         st.download_button(
-            "Download GeoJSON",
-            data=candidate_geojson(candidate, f"Swiss hiking loop {idx}"),
+            t("results.download_geojson"),
+            data=candidate_geojson(candidate, t("results.export_track_name", number=idx)),
             file_name=f"hiking_loop_{idx}.geojson",
             mime="application/geo+json",
             use_container_width=True,
         )
 
     st.download_button(
-        f"Download all {len(candidates)} as ZIP",
+        t("results.download_zip", count=len(candidates)),
         data=zip_candidates(candidates),
         file_name="swiss_hiking_loops.zip",
         mime="application/zip",
@@ -998,6 +996,5 @@ if candidates:
 
 st.divider()
 st.caption(
-    "Safety: this planner evaluates mapped route category, time, elevation and steepness. "
-    "It does not assess current closures, snow, weather, livestock, dog restrictions or trail surface conditions."
+    t("footer.safety")
 )

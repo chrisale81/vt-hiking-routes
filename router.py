@@ -20,6 +20,7 @@ import pyogrio
 import requests
 from pyproj import Transformer
 from shapely.geometry import GeometryCollection, LineString, MultiLineString, Point as ShapelyPoint, mapping, shape as shapely_shape
+from i18n import t
 from shapely.ops import transform as shapely_transform, unary_union
 
 
@@ -251,7 +252,7 @@ def resolve_current_geopackage(session: requests.Session | None = None) -> tuple
     response.raise_for_status()
     payload = response.json()
     if not payload.get("success"):
-        raise HikingPlannerError("opendata.swiss CKAN request was not successful.")
+        raise HikingPlannerError(t("errors.ckan_failed"))
 
     result = payload["result"]
     candidates = []
@@ -263,7 +264,7 @@ def resolve_current_geopackage(session: requests.Session | None = None) -> tuple
             candidates.append(resource)
 
     if not candidates:
-        raise HikingPlannerError("Could not find the GeoPackage ZIP resource in opendata.swiss.")
+        raise HikingPlannerError(t("errors.no_gpkg_resource"))
 
     resource = candidates[0]
     url = resource.get("download_url") or resource.get("url")
@@ -333,7 +334,7 @@ def download_and_extract_dataset(cache_dir: Path, refresh: bool = False) -> Path
 
     gpkg_files = list(extract_dir.rglob("*.gpkg"))
     if not gpkg_files:
-        raise HikingPlannerError("No .gpkg file found after extraction.")
+        raise HikingPlannerError(t("errors.no_gpkg_after_extract"))
     return gpkg_files[0]
 
 
@@ -342,7 +343,7 @@ def select_line_layer(gpkg: Path, requested: str | None = None) -> str:
     names = [str(row[0]) for row in layers]
     if requested:
         if requested not in names:
-            raise HikingPlannerError(f"Layer {requested!r} not found. Available: {', '.join(names)}")
+            raise HikingPlannerError(t("errors.layer_not_found", layer=repr(requested), available=", ".join(names)))
         return requested
 
     line_layers = [(str(row[0]), str(row[1] or "")) for row in layers if "LineString" in str(row[1] or "")]
@@ -352,7 +353,7 @@ def select_line_layer(gpkg: Path, requested: str | None = None) -> str:
     if len(preferred) == 1:
         return preferred[0]
     if not line_layers:
-        raise HikingPlannerError("No LineString layer found in the GeoPackage.")
+        raise HikingPlannerError(t("errors.no_line_layer"))
     raise HikingPlannerError(
         "Several line layers were found. Set a layer explicitly. Candidates: "
         + ", ".join(name for name, _ in line_layers)
@@ -579,9 +580,9 @@ def load_hiking_lines(
 ) -> gpd.GeoDataFrame:
     gdf = pyogrio.read_dataframe(gpkg, layer=layer, bbox=bbox)
     if gdf.empty:
-        raise HikingPlannerError("No hiking features found in the selected area.")
+        raise HikingPlannerError(t("errors.no_features"))
     if gdf.crs is None:
-        raise HikingPlannerError("The hiking dataset has no CRS information.")
+        raise HikingPlannerError(t("errors.no_crs"))
     if gdf.crs.to_epsg() != EPSG_LV95:
         gdf = gdf.to_crs(EPSG_LV95)
 
@@ -591,7 +592,7 @@ def load_hiking_lines(
         & gdf.geom_type.isin(["LineString", "MultiLineString"])
     ].copy()
     if gdf.empty:
-        raise HikingPlannerError("No usable hiking line geometry found.")
+        raise HikingPlannerError(t("errors.no_geometry"))
 
     category_col = detect_hiking_column([str(c) for c in gdf.columns if c != gdf.geometry.name])
     if category_col:
@@ -622,7 +623,7 @@ def load_hiking_lines(
     if alpine_forbidden:
         gdf = gdf[gdf["_category"] != CATEGORY_ALPIN].copy()
     if gdf.empty:
-        raise HikingPlannerError("No hiking lines remain after excluding alpine hiking trails.")
+        raise HikingPlannerError(t("errors.no_lines_after_alpine"))
 
     if exclusion is not None:
         # Cut the guarded pastures out rather than dropping whole trails: a path that
@@ -634,8 +635,7 @@ def load_hiking_lines(
             gdf = gdf[gdf.geom_type.isin(["LineString", "MultiLineString"])].copy()
         if gdf.empty:
             raise HikingPlannerError(
-                "The whole area around this start is alpine pasture guarded by "
-                "livestock guardian dogs, so no route avoids them."
+                t("errors.all_pasture")
             )
     return gdf
 
@@ -792,14 +792,14 @@ def build_graph(gdf: gpd.GeoDataFrame, config: PlannerConfig) -> nx.Graph:
                 prev = cur
 
     if graph.number_of_edges() == 0:
-        raise HikingPlannerError("The routing graph contains no edges.")
+        raise HikingPlannerError(t("errors.graph_empty"))
     return graph
 
 
 def nearest_graph_node(graph: nx.Graph, point: tuple[float, float]) -> tuple[tuple[float, float], float]:
     nodes = np.asarray(list(graph.nodes), dtype=float)
     if len(nodes) == 0:
-        raise HikingPlannerError("Routing graph is empty.")
+        raise HikingPlannerError(t("errors.graph_no_nodes"))
     d2 = (nodes[:, 0] - point[0]) ** 2 + (nodes[:, 1] - point[1]) ** 2
     idx = int(np.argmin(d2))
     node = (float(nodes[idx, 0]), float(nodes[idx, 1]))
@@ -846,12 +846,12 @@ def route_between(graph: nx.Graph, a_lv95: tuple[float, float], b_lv95: tuple[fl
     b, db = nearest_graph_node(graph, b_lv95)
     if da > max_snap_m or db > max_snap_m:
         raise HikingPlannerError(
-            f"Reference point is too far from hiking network (snap {max(da, db):.0f} m; limit {max_snap_m:.0f} m)."
+            t("errors.reference_too_far", distance=f"{max(da, db):.0f}", limit=f"{max_snap_m:.0f}")
         )
     try:
         return nx.shortest_path(graph, source=a, target=b, weight="routing_cost")
     except nx.NetworkXNoPath as exc:
-        raise HikingPlannerError("No hiking route found between the reference points.") from exc
+        raise HikingPlannerError(t("errors.no_reference_route")) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -908,7 +908,7 @@ def fetch_elevation_profile(
     response.raise_for_status()
     profile = response.json()
     if not isinstance(profile, list) or not profile:
-        raise HikingPlannerError("geo.admin.ch returned an empty elevation profile.")
+        raise HikingPlannerError(t("errors.profile_empty"))
     return profile
 
 
@@ -943,7 +943,7 @@ def profile_stats(profile: Sequence[dict], distance_m: float, window_m: float = 
             elevs.append(z)
 
     if len(dists) < 2:
-        raise HikingPlannerError("Elevation profile did not contain enough valid samples.")
+        raise HikingPlannerError(t("errors.profile_too_few"))
 
     d = np.asarray(dists, dtype=float)
     z = np.asarray(elevs, dtype=float)
@@ -1121,7 +1121,7 @@ def generate_loop_candidates(
     start_node, snap = nearest_graph_node(graph, start_lv95)
     if snap > config.max_snap_m:
         raise HikingPlannerError(
-            f"Start is {snap:.0f} m from the hiking network; limit is {config.max_snap_m:.0f} m."
+            t("errors.start_too_far", distance=f"{snap:.0f}", limit=f"{config.max_snap_m:.0f}")
         )
 
     target_minutes = config.duration_hours * 60.0
@@ -1157,7 +1157,7 @@ def generate_loop_candidates(
             break
     pivot_pool = spread
     if not pivot_pool:
-        raise HikingPlannerError("No suitable turnaround points were found in the requested direction.")
+        raise HikingPlannerError(t("errors.no_pivots"))
 
     rough_candidates: list[tuple[float, list[tuple[float, float]], tuple[float, float], float]] = []
     too_much_road: list[float] = []
@@ -1221,12 +1221,12 @@ def generate_loop_candidates(
     if not rough_candidates:
         if too_much_road:
             raise HikingPlannerError(
-                f"Every loop here spends more than {config.max_car_road_share * 100:.0f}% of its "
-                f"length on roads shared with cars (best was {min(too_much_road):.0f}%). Raise the "
-                f"road tolerance, or start somewhere with more car-free paths."
+                t("errors.loops_too_much_road",
+                  tolerance=f"{config.max_car_road_share * 100:.0f}",
+                  best=f"{min(too_much_road):.0f}")
             )
         raise HikingPlannerError(
-            "The local hiking graph has no sufficiently non-retracing loop in that direction. Try a wider direction cone or allow more repeated trail."
+            t("errors.no_open_loop")
         )
 
     sess = session or requests.Session()
@@ -1310,16 +1310,16 @@ def generate_loop_candidates(
         if over_target:
             closest = min(over_target, key=lambda m: abs(m - target_minutes))
             raise HikingPlannerError(
-                f"Every loop found here misses the requested {config.duration_hours:.2f} h by more "
-                f"than {config.max_duration_error * 100:.0f}% once the climb is measured "
-                f"(closest was {closest / 60:.2f} h). Try that duration, or a start with a denser "
-                f"trail network."
+                t("errors.loops_wrong_duration",
+                  target=f"{config.duration_hours:.2f}",
+                  tolerance=f"{config.max_duration_error * 100:.0f}",
+                  closest=f"{closest / 60:.2f}")
             )
         if reference_grade_limit is not None:
             raise HikingPlannerError(
-                "Loop candidates were found, but none stayed within the reference steepness limit."
+                t("errors.loops_too_steep")
             )
-        raise HikingPlannerError("Loop candidates were found, but none could be evaluated successfully.")
+        raise HikingPlannerError(t("errors.loops_unevaluated"))
     return final
 
 
@@ -1395,12 +1395,17 @@ def plan_point_to_point(
                 areas = fetch_herding_dog_areas(bbox, session=session)
             except Exception as exc:
                 raise HikingPlannerError(
-                    f"Could not load the federal herding-dog pasture layer ({exc}). "
-                    "Routes are not planned without it while 'Avoid herding dog pastures' is on."
+                    t("errors.pasture_layer_unavailable", error=exc)
                 ) from exc
         exclusion = herding_dog_exclusion(areas, config.herding_dog_buffer_m)
-        labelled = [("start", points[0]), ("destination", points[-1])]
-        labelled += [(f"waypoint {i}", p) for i, p in enumerate(points[1:-1], start=1)]
+        labelled = [
+            (t("errors.point_names.start"), points[0]),
+            (t("errors.point_names.destination"), points[-1]),
+        ]
+        labelled += [
+            (t("errors.point_names.waypoint", number=i), p)
+            for i, p in enumerate(points[1:-1], start=1)
+        ]
         for label, point in labelled:
             if exclusion is None or not exclusion.contains(ShapelyPoint(*point)):
                 continue
@@ -1410,10 +1415,7 @@ def plan_point_to_point(
             ]
             where = f" ({', '.join(named)})" if named else ""
             raise HikingPlannerError(
-                f"The {label} lies inside an alpine pasture guarded by livestock guardian "
-                f"dogs{where}, so no route can reach it while those areas are excluded. "
-                "Pick a point outside the shaded area, or switch off 'Avoid herding dog "
-                "pastures'."
+                t("errors.point_in_pasture", point=label, where=where)
             )
 
     gdf = load_hiking_lines(
@@ -1426,8 +1428,7 @@ def plan_point_to_point(
         node, snap = nearest_graph_node(graph, point)
         if snap > config.max_snap_m:
             raise HikingPlannerError(
-                f"A chosen point is {snap:.0f} m from the hiking network; "
-                f"the limit is {config.max_snap_m:.0f} m. Pick a spot nearer a path."
+                t("errors.point_too_far", distance=f"{snap:.0f}", limit=f"{config.max_snap_m:.0f}")
             )
         snapped.append(node)
 
@@ -1435,8 +1436,7 @@ def plan_point_to_point(
     routes = _alternative_paths(graph, legs, alternatives)
     if not routes:
         raise HikingPlannerError(
-            "No hiking route connects those points. They may sit in separate valleys, "
-            "or an excluded area may cut the only link."
+            t("errors.no_route_between_points")
         )
 
     sess = session or requests.Session()
@@ -1493,12 +1493,10 @@ def plan_point_to_point(
     if not final:
         if reference_grade_limit is not None:
             raise HikingPlannerError(
-                "A route exists, but none stayed within the reference steepness limit. "
-                "Raise the tolerance or switch the steepness reference off."
+                t("errors.route_too_steep")
             )
         raise HikingPlannerError(
-            f"A route exists, but every variant spends more than "
-            f"{config.max_car_road_share * 100:.0f}% of its length on roads shared with cars."
+            t("errors.route_too_much_road", tolerance=f"{config.max_car_road_share * 100:.0f}")
         )
 
     final.sort(key=lambda c: c.score)
@@ -1589,15 +1587,12 @@ def plan_loops(
                 ]
                 where = f" ({', '.join(inside)})" if inside else ""
                 margin = (
-                    f" It is within the {config.herding_dog_buffer_m:.0f} m safety margin rather "
-                    "than the pasture itself, so reducing the margin would allow routing."
+                    t("errors.start_in_margin_hint", margin=f"{config.herding_dog_buffer_m:.0f}")
                     if not inside
                     else ""
                 )
                 raise HikingPlannerError(
-                    f"The start lies inside an alpine pasture guarded by livestock guardian "
-                    f"dogs{where}, so no route can leave it while those areas are excluded."
-                    f"{margin} Move the start, or switch off 'Avoid herding dog pastures'."
+                    t("errors.start_in_pasture", where=where, margin=margin)
                 )
         try:
             gdf = load_hiking_lines(
@@ -1615,7 +1610,7 @@ def plan_loops(
             return candidates, graph
         except HikingPlannerError as exc:
             last_error = exc
-    raise HikingPlannerError(f"Could not generate a loop after expanding the search area. Last reason: {last_error}")
+    raise HikingPlannerError(t("errors.loop_search_failed", reason=last_error))
 
 
 # ---------------------------------------------------------------------------
