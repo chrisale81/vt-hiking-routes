@@ -1,8 +1,7 @@
 {
   "_meta": {
     "language": "gsw-chur",
-    "Nama": "Khurerdeutsch (Chur German)",
-    "based_on": "an.json",
+    "based_on": "en.json",
     "status": "translated; dialect spelling is unstandardised, a native check is welcome",
     "rules": [
       "Placeholders in braces such as {count} or {hours} are filled in by the app. Keep them exactly, including the braces. They may be reordered to suit the sentence.",
@@ -12,27 +11,17 @@
       "Chur German has no fixed spelling. Write it as it is spoken; consistency within the file matters more than any rule."
     ],
     "counts": {
-      "ui": 134,
+      "ui": 136,
       "errors": 37
-    }
+    },
+    "name": "Khurerdeutsch (Chur German)"
   },
   "app": {
     "title": "🥾 Bündner WanderRouta-Planer",
-    "tagline": "Offiziells swissTLM3D Wandernetz · Alpinwanderwäg sind gsperrt · GPX / GeoJSON Export"
+    "tagline": "Offiziells swissTLM3D Wandernetz · Alpinwanderwäg sind gsperrt · GPX / GeoJSON Export",
+    "page_title": "Bündner WanderRouta-Planer"
   },
   "sidebar": {
-    "Routa_target": {
-      "header": "Was für e Tour",
-      "loop": "Rundi",
-      "loop_help": "Wenn s uus isch, gits e Strecki vom Start über d Zwüschapünkt zum Ziel.",
-      "duration": "Wanderziit",
-      "duration_help_loop": "wia lang d Rundi öppa söll duure.",
-      "duration_help_oneway": "Bi dära Strecki spilts kai Rolle: Start und Ziel gänd d Ziit vor.",
-      "alpine": "Alpinwanderwäg verbotta",
-      "alpine_help": "Alpinwanderwäg (wiiss-blau-wiiss) verlangend Trittsicherheit, Schwindelfreiheit und öppa d Händ. Wenn dus uusanimmsch, sinds erlaubt.",
-      "alpine_warning": "Alpini Routa chönd usgsetzt oder gsicheret sii — nüt für an Hund.",
-      "duration_caption": "D Ziit rechnet nochem dr Schwiizer Wanderwäg-Regla, ohni Pausa."
-    },
     "roads_dogs": {
       "header": "Strossa und Hünd",
       "avoid_dogs": "Alpa mit Herdaschutzhünd magari miida",
@@ -57,11 +46,23 @@
       "pivots": "Wendepünkt zum Prüefa",
       "duration_tolerance": "Toleranz bi dr Ziit",
       "duration_tolerance_help": "Rundina wo mit dr gmässna Ziit meh drnäbad liegend als das, wärdend uusgschieda.",
-      "Routa_count": "wia vill Routa zeiga"
+      "route_count": "wia vill Routa zeiga"
     },
     "dataset": {
       "refresh_button": "Wanderdata neu lada",
       "refresh_done": "Bi dr nögschta Berechnig wird frisch vu opendata.swiss abaglada."
+    },
+    "route_target": {
+      "header": "Was für e Tour",
+      "loop": "Rundi",
+      "loop_help": "Wenn s uus isch, gits e Strecki vom Start über d Zwüschapünkt zum Ziel.",
+      "duration": "Wanderziit",
+      "duration_help_loop": "wia lang d Rundi öppa söll duure.",
+      "duration_help_oneway": "Bi dära Strecki spilts kai Rolle: Start und Ziel gänd d Ziit vor.",
+      "alpine": "Alpinwanderwäg verbotta",
+      "alpine_help": "Alpinwanderwäg (wiiss-blau-wiiss) verlangend Trittsicherheit, Schwindelfreiheit und öppa d Händ. Wenn dus uusanimmsch, sinds erlaubt.",
+      "alpine_warning": "Alpini Routa chönd usgsetzt oder gsicheret sii — nüt für an Hund.",
+      "duration_caption": "D Ziit rechnet nochem dr Schwiizer Wanderwäg-Regla, ohni Pausa."
     }
   },
   "points": {
@@ -121,12 +122,12 @@
   },
   "actions": {
     "generate_loops": "Rundina berechna",
-    "plan_Routa": "Routa plana",
     "missing_prefix": "Das fählt no, bevor mr rechne kann: ",
     "missing_start": "an Start",
     "missing_second": "as {second}",
     "missing_reference": "beidi End vu dr Referänz Routa",
-    "missing_map_hint": ". Uf dr Karta wählsch jeda Punkt unna *dr nögscht Klick setzt* uus und klicksch denn druf."
+    "missing_map_hint": ". Uf dr Karta wählsch jeda Punkt unna *dr nögscht Klick setzt* uus und klicksch denn druf.",
+    "plan_route": "Routa plana"
   },
   "status": {
     "preparing": "Offizielli Wanderdata parat macha…",
@@ -141,8 +142,6 @@
     "ready": "Routa sind parat"
   },
   "results": {
-    "Routa_tab": "Routa",
-    "Routa_label": "Routa {number}",
     "metric_duration": "Wanderziit",
     "metric_distance": "Distanz",
     "metric_ascent": "Ufstig",
@@ -160,10 +159,12 @@
     "profile_axis_elevation": "Höchi (m)",
     "download_gpx": "GPX abalada",
     "download_geojson": "GeoJSON abalada",
-    "download_zip": "Alli {count} als ZIP abalada"
+    "download_zip": "Alli {count} als ZIP abalada",
+    "route_tab": "Routa",
+    "route_label": "Routa {number}",
+    "export_track_name": "Bündner WanderRouta {number}"
   },
   "map": {
-    "tooltip_Routa": "Brechneti Wanderrouta",
     "tooltip_road": "Stross mit Auto — Hund an d Leine",
     "tooltip_start": "Start",
     "tooltip_direction": "Richtigsziel",
@@ -173,11 +174,12 @@
     "layer_km": "Kilometer-Marka",
     "layer_roads": "Mit Auto teilt",
     "layer_pastures": "Alpa mit Härdaschutzhünd",
-    "pasture_tooltip": "{Nama} — Härdaschutzhünd",
-    "pasture_popup": "<b>{Nama}</b><br>Härdaschutzhünd — nid mit em Hund inazottla.",
+    "pasture_tooltip": "{name} — Härdaschutzhünd",
+    "pasture_popup": "<b>{name}</b><br>Härdaschutzhünd — nid mit em Hund inazottla.",
     "pasture_contact": "Kontakt: {contact}",
     "pasture_link": "Offizielli Alpkarta",
-    "layer_swisstopo": "swisstopo"
+    "layer_swisstopo": "swisstopo",
+    "tooltip_route": "Brechneti Wanderrouta"
   },
   "warnings": {
     "herding_nearby": "**Härdaschutzhünd: {count} gschützti Alp(a) in dr Nöchi** — {names}{more}. dia sind us dr Routa ussagschnitta und uf dr Karta orange schattiart. Härdaschutzhünd verteidigid d Herde gäge fremdi Hünd, drum gang nid mit em Hund dure. D Beweidig isch saisonal und dr Bundes-Layer kann nid aktuell sii — luag vor em Loszottla uf [protectiondestroupeaux.ch](https://www.protectiondestroupeaux.ch/).",
@@ -209,7 +211,6 @@
     "start_too_far": "dr Start isch {distance} m vom Wandernetz awägg; erlaubt sind {limit} m.",
     "point_too_far": "an gwählta Punkt isch {distance} m vom Wandernetz awägg; erlaubt sind {limit} m. Nimm an Ort nöcher am Wäg.",
     "reference_too_far": "dr Referänzpunkt isch z wiit vom Wandernetz awägg ({distance} m; erlaubt {limit} m).",
-    "no_reference_Routa": "Zwüschet dr Referänzpünkt hät mr kai Wanderrouta gfunde.",
     "profile_empty": "geo.admin.ch hät as leers Höhaprofil zruggeh.",
     "profile_too_few": "Z Höhaprofil hät z wenig bruuchbari Määsspünkt.",
     "no_pivots": "In dr gwünschta Richtig hemer mr kai passendi Wendepünkt gfunde.",
@@ -219,12 +220,13 @@
     "loops_too_steep": "as hät Rundina geh, aber kai isch under dr Refarenz-Stiigig blibe.",
     "loops_unevaluated": "as hät Rundina geh, aber kai hät mr könna uuswerte.",
     "loop_search_failed": "Au nochem em Vergrössara vom Suechgebiet häts kai Rundi geh. Letschta Grund: {reason}",
-    "no_Routa_between_points": "Zwüschet dene Pünkt hät s kai Wanderrouta. Villicht liegand sie i verschiidna Täler, oder as gsperrts Gebiat schniidet dia einzig Verbindig ab.",
-    "Routa_too_much_road": "A Routa gäbts scho, aber jedi Varianta lauft uf meh als {tolerance}% vu dr Längi uf Strossa mit Auto.",
-    "Routa_too_steep": "A Routa gäb s scho, aber kai isch under dr Refarenz-Stiigig bliba. Erhöh d Toleranz oder schalt d Refarenz uus.",
     "start_in_pasture": "dr Start liggt in ra Alpweid mit Härdaschutzhünd{where}, drum kunt mr nid awägg solang dia Gebiet gsperrt sind.{margin} Verschieb dr Start oder schalt ‘Alpe mit Härdaschutzhünd miide’ uus.",
     "start_in_margin_hint": " Er liggt im Sicherheitsabstand vu {margin} m und nid i dr Alp sälber — mit amana klinara Abstand gings.",
     "point_in_pasture": "{point} liggt in ara Alpweid mit Härdaschutzhünd{where}, drum chunt mer nid ana solang dia Gebiet gsperrt sind. Nimm an Punkt usserhalb vom schattiarta Gebiat oder schalt ‘Alpa mit Härdaschutzhünd miide’ uus.",
-    "pasture_layer_unavailable": "dr Bundes-Layer mit dr Herdeschutzhund-Alpa hät mer nid könna lada ({error}). Solang ‘Alpa mit Härdaschutzhünd miide’ aa isch, wird ohni das kai Routa grechnat."
+    "pasture_layer_unavailable": "dr Bundes-Layer mit dr Herdeschutzhund-Alpa hät mer nid könna lada ({error}). Solang ‘Alpa mit Härdaschutzhünd miide’ aa isch, wird ohni das kai Routa grechnat.",
+    "no_reference_route": "Zwüschet dr Referänzpünkt hät mr kai Wanderrouta gfunde.",
+    "no_route_between_points": "Zwüschet dene Pünkt hät s kai Wanderrouta. Villicht liegand sie i verschiidna Täler, oder as gsperrts Gebiat schniidet dia einzig Verbindig ab.",
+    "route_too_much_road": "A Routa gäbts scho, aber jedi Varianta lauft uf meh als {tolerance}% vu dr Längi uf Strossa mit Auto.",
+    "route_too_steep": "A Routa gäb s scho, aber kai isch under dr Refarenz-Stiigig bliba. Erhöh d Toleranz oder schalt d Refarenz uus."
   }
 }
