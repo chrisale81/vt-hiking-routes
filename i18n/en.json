@@ -25,7 +25,7 @@
     "errors.point_in_pasture": "{point} is 'start', 'destination' or 'waypoint 2'. Those words come from errors.point_names below."
   },
   "app": {
-    "title": "🥾 Swiss Hiking Loop Planner",
+    "title": "🥾 Swiss Hiking Loop Planner dsd",
     "tagline": "Official swissTLM3D hiking network · hard ban on alpine hiking trails · GPX / GeoJSON export"
   },
   "sidebar": {
