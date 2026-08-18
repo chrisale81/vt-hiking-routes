@@ -1,0 +1,240 @@
+{
+  "_meta": {
+    "language": "gsw-chur",
+    "name": "Khurerdeutsch (Chur German)",
+    "based_on": "en.json",
+    "status": "untranslated — values are still English, overwrite them in place",
+    "purpose": "Translate the values, never the keys. Keys must stay identical to en.json.",
+    "rules": [
+      "Placeholders in braces such as {count} or {hours} are filled in by the app. Keep them exactly, including the braces. They may be reordered to suit the sentence.",
+      "Markdown is live: **bold** renders as bold, and [text](url) is a link. Keep the markers and the url, translate only the words.",
+      "Do not translate official names: swissTLM3D, Wanderweg, Bergwanderweg, Alpinwanderweg, Herdenschutzhunde, BAFU, swisstopo, geo.admin.ch, opendata.swiss, GPX, GeoJSON.",
+      "Units stay as they are: km, m, h, %.",
+      "Chur German has no fixed spelling. Write it as it is spoken; consistency within the file matters more than any rule."
+    ],
+    "counts": {
+      "ui": 134,
+      "errors": 37
+    }
+  },
+  "_notes": {
+    "sidebar.steepness.header": "'Steepness X' is the original odd label for the reference-route section. Feel free to give it a name that actually makes sense.",
+    "points.map.step2_loop": "In loop mode the second point only sets the direction the loop heads in. It is not a place you walk to.",
+    "results.metric_grade": "The steepest sustained climb measured over any 50 m stretch.",
+    "results.detail_caption": "{road_note} is one of the three road_note strings below.",
+    "warnings.herding_nearby": "{names} is a comma-separated list of pasture names, {more} is ' …' when the list was cut short, otherwise empty.",
+    "errors.start_in_pasture": "{where} is ' (Pasture name)' or empty. {margin} is an extra sentence about the safety margin, or empty.",
+    "errors.point_in_pasture": "{point} is 'start', 'destination' or 'waypoint 2'. Those words come from errors.point_names below."
+  },
+  "app": {
+    "title": "🥾 Swiss Hiking Loop Planner",
+    "tagline": "Official swissTLM3D hiking network · hard ban on alpine hiking trails · GPX / GeoJSON export"
+  },
+  "sidebar": {
+    "route_target": {
+      "header": "Route target",
+      "loop": "Loop",
+      "loop_help": "Off plans a one-way route from the start, through any waypoints, to a destination.",
+      "duration": "Duration",
+      "duration_help_loop": "Target length of the loop.",
+      "duration_help_oneway": "Ignored for a one-way route: the endpoints decide how long it is.",
+      "alpine": "Alpine hiking trails forbidden",
+      "alpine_help": "Alpinwanderweg (white-blue-white) demands sure-footedness, a head for heights and sometimes hands. Unticking allows them.",
+      "alpine_warning": "Alpine routes may include exposed or secured terrain, unsuitable for dogs.",
+      "duration_caption": "Duration uses the Swiss Hiking Trails rule and excludes breaks."
+    },
+    "roads_dogs": {
+      "header": "Roads and dogs",
+      "avoid_dogs": "Avoid herding dog pastures",
+      "avoid_dogs_help": "Alpine pastures guarded by livestock guardian dogs (BAFU layer ch.bafu.alpweiden-herdenschutzhunde). The dogs treat an approaching dog as a threat to the herd, so these areas are cut out of the route network.",
+      "road_share": "Max share on roads with cars",
+      "road_share_help": "Roads shared with motor traffic are avoided as far as the network allows. This is how much of the loop may still run on one - a loop usually has to leave the village somehow.",
+      "margin": "Safety margin around pastures",
+      "margin_help": "Extra distance kept clear of the mapped pasture boundary. Note that a margin can swallow a trailhead that sits close to a boundary, which makes every route from it impossible.",
+      "caption": "Width and driving bans come from swissTLM3D; farm tracks closed to cars do not count."
+    },
+    "steepness": {
+      "header": "Steepness reference",
+      "limit": "Limit steepness to reference route"
+    },
+    "advanced": {
+      "header": "Advanced routing",
+      "other_penalty": "Penalty for ‘andere’ paths",
+      "other_penalty_help": "Higher means official Wanderweg/Bergwanderweg segments are preferred more strongly.",
+      "steepness_tolerance": "Reference steepness tolerance",
+      "direction_cone": "Direction cone",
+      "repeated": "Maximum repeated trail",
+      "pivots": "Turnaround points to evaluate",
+      "duration_tolerance": "Duration tolerance",
+      "duration_tolerance_help": "Loops whose measured walking time misses the target by more than this are discarded.",
+      "route_count": "Routes to show"
+    },
+    "dataset": {
+      "refresh_button": "Refresh hiking dataset",
+      "refresh_done": "A fresh opendata.swiss download will be used on the next route calculation."
+    }
+  },
+  "points": {
+    "heading_loop": "Start and direction",
+    "heading_oneway": "Start and destination",
+    "choose_by": "Choose points by",
+    "choose_by_help": "Search uses the official geo.admin.ch index. Map lets you click any spot.",
+    "mode_search": "Search",
+    "mode_map": "Map",
+    "search": {
+      "start": "Start",
+      "destination": "Destination",
+      "direction": "Direction",
+      "resolved": "Resolved location",
+      "manual_toggle": "Use manual coordinates",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "enter_place": "Enter a Swiss place, address or mapped name.",
+      "no_result": "No official geo.admin.ch location result. Refine the name or switch to manual coordinates."
+    },
+    "map": {
+      "step1": "**Step 1 of 2** — click the map to place the **start**. The picker then moves on to the {second} by itself.",
+      "step2_loop": "**Step 2 of 2** — now click the **{second}**, which sets the direction the loop should head in.",
+      "step2_oneway": "**Step 2 of 2** — now click the **{second}**, where the route should end.",
+      "ready": "Start and {second} are set — press **{button}** below.",
+      "ready_waypoint_hint": " Add waypoints first if you want the route to pass by them.",
+      "next_click": "Next click places",
+      "next_click_help": "Each click places this kind of point. It advances automatically once the start and the second point are set.",
+      "role_start": "Start",
+      "role_direction": "Direction target",
+      "role_destination": "Destination",
+      "role_waypoint": "Waypoint",
+      "undo": "Undo waypoint",
+      "clear": "Clear all",
+      "empty_hint": "Click the map to place the start.",
+      "summary_start": "start {coords}",
+      "summary_waypoints": "{count} waypoint(s)",
+      "summary_destination": "destination {coords}",
+      "summary_direction": "direction {coords}",
+      "pastures_failed": "Herding dog pastures could not be loaded for the map ({error})."
+    },
+    "waypoints": {
+      "expander": "Waypoints ({count})",
+      "listed": "{index}. {lat}, {lon}",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "add": "Add",
+      "remove_all": "Remove all waypoints"
+    }
+  },
+  "steepness": {
+    "heading": "Steepness X",
+    "off_notice": "Steepness limit is off. Routes still report their measured steepness.",
+    "ref_start": "Reference start",
+    "ref_end": "Reference end",
+    "ceiling": "Steepness ceiling: **{limit}% over a 50 m window** (reference measured at {measured}%)."
+  },
+  "actions": {
+    "generate_loops": "Generate hiking loops",
+    "plan_route": "Plan the route",
+    "missing_prefix": "Still needed before routes can be calculated: ",
+    "missing_start": "a start",
+    "missing_second": "a {second}",
+    "missing_reference": "both ends of the steepness reference route",
+    "missing_map_hint": ". On the map, place each one by picking it under *Next click places*, then clicking."
+  },
+  "status": {
+    "preparing": "Preparing official hiking data…",
+    "using_layer": "Using layer: `{layer}`",
+    "loading_pastures": "Loading herding dog pastures…",
+    "pastures_found": "{count} guarded pasture(s) in range — excluded from routing.",
+    "pastures_none": "No guarded pastures recorded in range.",
+    "measuring_reference": "Measuring reference steepness…",
+    "reference_line": "Reference: {from} → {to}: {measured}% sustained max; allowed {limit}% with tolerance.",
+    "searching_loops": "Searching loops toward the requested direction…",
+    "routing_oneway": "Routing to the destination via {count} waypoint(s)…",
+    "ready": "Routes ready"
+  },
+  "results": {
+    "route_tab": "Route",
+    "route_label": "Route {number}",
+    "metric_duration": "Duration",
+    "metric_distance": "Distance",
+    "metric_ascent": "Ascent",
+    "metric_grade": "Max 50 m grade",
+    "metric_official": "Official paths",
+    "metric_cars": "Shared with cars",
+    "metric_cars_help": "Share of the loop on roads open to motor traffic, drawn in red on the map.",
+    "detail_caption": "Descent {descent} m · repeated trail {repeated}% · 95th-percentile sampled grade {p95}% · {road_note}",
+    "road_note_none": "no road shared with cars",
+    "road_note_some": "car-shared road {metres} m",
+    "road_note_major": " (of which {metres} m on a road 6 m or wider)",
+    "profile_hint": "Click the elevation profile to mark that spot on the map.",
+    "profile_marked": "Marked: **{km} km** into the loop at **{elevation} m** ({lat}, {lon}) — shown in red on the map.",
+    "profile_axis_distance": "Distance (km)",
+    "profile_axis_elevation": "Elevation (m)",
+    "download_gpx": "Download GPX",
+    "download_geojson": "Download GeoJSON",
+    "download_zip": "Download all {count} as ZIP"
+  },
+  "map": {
+    "tooltip_route": "Generated hiking loop",
+    "tooltip_road": "Shared with cars — keep the dog on the lead",
+    "tooltip_start": "Start",
+    "tooltip_direction": "Direction target",
+    "tooltip_destination": "Destination",
+    "tooltip_waypoint": "Waypoint {number}",
+    "tooltip_km": "km {number} · {elevation} m",
+    "layer_km": "Kilometre marks",
+    "layer_roads": "Shared with cars",
+    "layer_pastures": "Herding dog pastures",
+    "pasture_tooltip": "{name} — herding dogs",
+    "pasture_popup": "<b>{name}</b><br>Livestock guardian dogs — do not enter with a dog.",
+    "pasture_contact": "Contact: {contact}",
+    "pasture_link": "Official pasture map",
+    "layer_swisstopo": "swisstopo"
+  },
+  "warnings": {
+    "herding_nearby": "**Herding dogs: {count} guarded pasture(s) nearby** — {names}{more}. These are cut out of the routes and shaded orange on the map. Livestock guardian dogs defend the herd against approaching dogs, so do not enter them with one. Grazing is seasonal and the federal layer can lag reality — check [protectiondestroupeaux.ch](https://www.protectiondestroupeaux.ch/) before you go.",
+    "herding_none": "No pastures with livestock guardian dogs are recorded around these routes."
+  },
+  "footer": {
+    "safety": "Safety: this planner evaluates mapped route category, time, elevation and steepness. It does not assess current closures, snow, weather, livestock, dog restrictions or trail surface conditions."
+  },
+  "errors": {
+    "search_failed": "Swiss location search failed: {error}",
+    "point_names": {
+      "start": "start",
+      "destination": "destination",
+      "waypoint": "waypoint {number}"
+    },
+    "ckan_failed": "opendata.swiss CKAN request was not successful.",
+    "no_gpkg_resource": "Could not find the GeoPackage ZIP resource in opendata.swiss.",
+    "no_gpkg_after_extract": "No .gpkg file found after extraction.",
+    "layer_not_found": "Layer {layer} not found. Available: {available}",
+    "no_line_layer": "No LineString layer found in the GeoPackage.",
+    "several_line_layers": "Several line layers were found. Set a layer explicitly. Candidates: {candidates}",
+    "no_features": "No hiking features found in the selected area.",
+    "no_crs": "The hiking dataset has no CRS information.",
+    "no_geometry": "No usable hiking line geometry found.",
+    "no_lines_after_alpine": "No hiking lines remain after excluding alpine hiking trails.",
+    "all_pasture": "The whole area around this start is alpine pasture guarded by livestock guardian dogs, so no route avoids them.",
+    "graph_empty": "The routing graph contains no edges.",
+    "graph_no_nodes": "Routing graph is empty.",
+    "start_too_far": "Start is {distance} m from the hiking network; limit is {limit} m.",
+    "point_too_far": "A chosen point is {distance} m from the hiking network; the limit is {limit} m. Pick a spot nearer a path.",
+    "reference_too_far": "Reference point is too far from hiking network (snap {distance} m; limit {limit} m).",
+    "no_reference_route": "No hiking route found between the reference points.",
+    "profile_empty": "geo.admin.ch returned an empty elevation profile.",
+    "profile_too_few": "Elevation profile did not contain enough valid samples.",
+    "no_pivots": "No suitable turnaround points were found in the requested direction.",
+    "no_open_loop": "The local hiking graph has no sufficiently non-retracing loop in that direction. Try a wider direction cone or allow more repeated trail.",
+    "loops_too_much_road": "Every loop here spends more than {tolerance}% of its length on roads shared with cars (best was {best}%). Raise the road tolerance, or start somewhere with more car-free paths.",
+    "loops_wrong_duration": "Every loop found here misses the requested {target} h by more than {tolerance}% once the climb is measured (closest was {closest} h). Try that duration, or a start with a denser trail network.",
+    "loops_too_steep": "Loop candidates were found, but none stayed within the reference steepness limit.",
+    "loops_unevaluated": "Loop candidates were found, but none could be evaluated successfully.",
+    "loop_search_failed": "Could not generate a loop after expanding the search area. Last reason: {reason}",
+    "no_route_between_points": "No hiking route connects those points. They may sit in separate valleys, or an excluded area may cut the only link.",
+    "route_too_much_road": "A route exists, but every variant spends more than {tolerance}% of its length on roads shared with cars.",
+    "route_too_steep": "A route exists, but none stayed within the reference steepness limit. Raise the tolerance or switch the steepness reference off.",
+    "start_in_pasture": "The start lies inside an alpine pasture guarded by livestock guardian dogs{where}, so no route can leave it while those areas are excluded.{margin} Move the start, or switch off 'Avoid herding dog pastures'.",
+    "start_in_margin_hint": " It is within the {margin} m safety margin rather than the pasture itself, so reducing the margin would allow routing.",
+    "point_in_pasture": "The {point} lies inside an alpine pasture guarded by livestock guardian dogs{where}, so no route can reach it while those areas are excluded. Pick a point outside the shaded area, or switch off 'Avoid herding dog pastures'.",
+    "pasture_layer_unavailable": "Could not load the federal herding-dog pasture layer ({error}). Routes are not planned without it while 'Avoid herding dog pastures' is on."
+  }
+}

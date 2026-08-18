@@ -207,6 +207,24 @@ The 389 MB extract is the constraint to watch. Community Cloud does not guarante
 budget, so if a deploy dies during startup that is the first thing to suspect -- the
 Docker route below has no such limit.
 
+## Translations
+
+`i18n/en.json` holds every user-facing string in the app: 134 interface strings and 37
+error messages, grouped by where they appear. `i18n/gsw-chur.json` has the identical key
+structure with the English values still in place, ready to be overwritten.
+
+Two things matter when translating:
+
+- Placeholders in braces (`{count}`, `{hours}`) are filled in by the app. Keep them, but
+  move them around freely to suit the sentence.
+- Markdown is live: `**bold**` and `[text](url)` render as such.
+
+Official names are left untranslated: swissTLM3D, Wanderweg, Bergwanderweg,
+Alpinwanderweg, Herdenschutzhunde, BAFU, swisstopo.
+
+The files are the text inventory. The app does not read them yet -- it still has its
+strings inline.
+
 ## Important limitations
 
 This is a route-generation engine, not a live safety oracle. It currently does **not** evaluate:
