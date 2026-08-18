@@ -51,3 +51,23 @@ def test_the_same_point_can_be_reused_after_another_click():
     state = apply_pick(state, "Waypoint", (46.71, 8.84))
     state = apply_pick(state, "Waypoint", (46.70, 8.83))
     assert state["waypoints"] == [(46.70, 8.83), (46.71, 8.84), (46.70, 8.83)]
+
+
+def test_next_pick_role_walks_through_what_is_missing():
+    """The picker should advance on its own: start, then the second point, then waypoints."""
+    from app import next_pick_role
+
+    loop_roles = ["Start", "Destination"]
+    oneway_roles = ["Start", "Destination", "Waypoint"]
+
+    empty = {"start": None, "destination": None, "waypoints": []}
+    assert next_pick_role(empty, oneway_roles) == "Start"
+
+    with_start = {"start": (46.7, 8.8), "destination": None, "waypoints": []}
+    assert next_pick_role(with_start, oneway_roles) == "Destination"
+    assert next_pick_role(with_start, loop_roles) == "Destination"
+
+    both = {"start": (46.7, 8.8), "destination": (46.75, 8.85), "waypoints": []}
+    assert next_pick_role(both, oneway_roles) == "Waypoint"
+    # A loop has no waypoints, so it must not offer a role that is not on the radio.
+    assert next_pick_role(both, loop_roles) in loop_roles

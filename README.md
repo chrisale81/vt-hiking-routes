@@ -53,6 +53,13 @@ Points come either from the official `geo.admin.ch` search index or from clickin
 places, so you can set the start, the destination and any number of waypoints, with
 *Undo waypoint* and *Clear all* to correct yourself.
 
+Guarded pastures are shaded on the picker map too, so you can see them while deciding
+where to start rather than only after a route has been calculated.
+
+The picker walks through the points it still needs: place the start, and it moves on to
+the direction target (or destination) by itself. If the calculate button is greyed out it
+now says which point is still missing.
+
 Waypoints can also be typed as coordinates in the *Waypoints* panel. The map needs
 Leaflet from a CDN, which some networks block; without the typed fallback waypoints would
 be unreachable there.

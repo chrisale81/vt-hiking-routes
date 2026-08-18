@@ -105,6 +105,15 @@ def herding_areas_lv95(cached: list[dict]) -> list[dict]:
 PICK_ROLES = ("Start", "Destination", "Waypoint")
 
 
+def next_pick_role(points: dict, roles: list[str]) -> str:
+    """What the next click should place: the first thing still missing."""
+    if not points.get("start"):
+        return "Start"
+    if not points.get("destination"):
+        return "Destination"
+    return "Waypoint" if "Waypoint" in roles else "Destination"
+
+
 def apply_pick(points: dict, role: str, point: tuple[float, float] | None) -> dict:
     """Fold a map click into the chosen points.
 
@@ -149,6 +158,22 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
         "Waypoint": "Waypoint",
     }
 
+    start, dest = picked("Start"), picked("Destination")
+    second = labels["Destination"].lower()
+    if not start:
+        st.info(f"**Step 1 of 2** — click the map to place the **start**. "
+                f"The picker then moves on to the {second} by itself.")
+    elif not dest:
+        st.info(f"**Step 2 of 2** — now click the **{second}**"
+                + (", which sets the direction the loop should head in." if loop_mode
+                   else ", where the route should end."))
+    else:
+        st.success(
+            f"Start and {second} are set — press "
+            f"**{'Generate hiking loops' if loop_mode else 'Plan the route'}** below."
+            + ("" if loop_mode else " Add waypoints first if you want the route to pass by them.")
+        )
+
     controls, actions = st.columns([3, 1])
     with controls:
         role = st.radio(
@@ -157,6 +182,8 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
             format_func=lambda r: labels[r],
             horizontal=True,
             key="pick_role",
+            help="Each click places this kind of point. It advances automatically once "
+                 "the start and the second point are set.",
         )
     with actions:
         if st.button("Undo waypoint", use_container_width=True, disabled=not picked("Waypoint")):
@@ -167,9 +194,19 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
                 st.session_state.pop(key, None)
             st.rerun()
 
-    start, dest = picked("Start"), picked("Destination")
     waypoints = picked("Waypoint")
     centre = start or dest or (46.6961, 8.8278)
+
+    # Guarded pastures matter most while choosing where to start, so fetch them for the
+    # area on view rather than waiting until a route has been calculated.
+    if herding_areas is None:
+        cx, cy = latlon_to_lv95(centre)
+        span = 15000.0
+        try:
+            herding_areas = cached_herding_areas((cx - span, cy - span, cx + span, cy + span))
+        except Exception as exc:
+            herding_areas = []
+            st.caption(f"Herding dog pastures could not be loaded for the map ({exc}).")
 
     m = folium.Map(location=list(centre), zoom_start=12, tiles=None, control_scale=True)
     folium.TileLayer(
@@ -234,6 +271,8 @@ def map_point_picker(loop_mode: bool, herding_areas=None) -> None:
     st.session_state["pick_destination"] = after["destination"]
     st.session_state["pick_waypoints"] = after["waypoints"]
     st.session_state["pick_last_click"] = after["last"]
+    # Move to whatever still has to be placed, so the common path is just click, click.
+    st.session_state["pick_role"] = next_pick_role(after, roles)
     st.rerun()
 
 
@@ -698,11 +737,25 @@ config = PlannerConfig(
     max_duration_error=float(duration_tolerance_pct) / 100.0,
 )
 
-ready = start_latlon is not None and direction_latlon is not None
-if use_reference:
-    ready = ready and ref_start_latlon is not None and ref_end_latlon is not None
+second_label = "direction target" if loop_mode else "destination"
+missing = []
+if start_latlon is None:
+    missing.append("a start")
+if direction_latlon is None:
+    missing.append(f"a {second_label}")
+if use_reference and (ref_start_latlon is None or ref_end_latlon is None):
+    missing.append("both ends of the steepness reference route")
+ready = not missing
 
 st.divider()
+if missing:
+    # A greyed-out button with no reason is the most common way to get stuck here.
+    st.warning(
+        "Still needed before routes can be calculated: "
+        + ", ".join(missing)
+        + ("." if input_mode == "Search" else
+           ". On the map, place each one by picking it under *Next click places*, then clicking.")
+    )
 button_label = "Generate hiking loops" if loop_mode else "Plan the route"
 if st.button(button_label, type="primary", disabled=not ready, use_container_width=True):
     try:
